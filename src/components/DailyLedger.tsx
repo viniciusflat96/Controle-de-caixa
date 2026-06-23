@@ -1,0 +1,782 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useMemo } from 'react';
+import { Sale, Seller, SaleCategory, PaymentMethod } from '../types';
+import { getDaysInMonth, formatDateDisplay, getWeekdayName, formatCurrency } from '../utils';
+import { Plus, Trash2, Calendar, FileText, Filter, Search, ChevronLeft, ChevronRight, Edit3, X, Check } from 'lucide-react';
+
+interface DailyLedgerProps {
+  sales: Sale[];
+  sellers: Seller[];
+  selectedYear: number;
+  selectedMonth: number; // 1-indexed
+  onAddSale: (sale: Omit<Sale, 'id'>) => void;
+  onUpdateSale: (sale: Sale) => void;
+  onDeleteSale: (id: string) => void;
+}
+
+export default function DailyLedger({
+  sales,
+  sellers,
+  selectedYear,
+  selectedMonth,
+  onAddSale,
+  onUpdateSale,
+  onDeleteSale,
+}: DailyLedgerProps) {
+  // Lista de dias do mês selecionado
+  const days = useMemo(() => getDaysInMonth(selectedYear, selectedMonth), [selectedYear, selectedMonth]);
+  
+  // Dia atualmente selecionado (padrão: dia atual do sistema ou o dia 1 do mês selecionado)
+  const todayISO = useMemo(() => {
+    const today = new Date();
+    const dayStr = String(today.getDate()).padStart(2, '0');
+    const monthStr = String(selectedMonth).padStart(2, '0');
+    const targetISO = `${selectedYear}-${monthStr}-${dayStr}`;
+    return days.includes(targetISO) ? targetISO : days[0];
+  }, [days, selectedYear, selectedMonth]);
+
+  const [selectedDate, setSelectedDate] = useState<string>(todayISO);
+  const [viewAllDays, setViewAllDays] = useState<boolean>(false);
+
+  // Estados do formulário de nova venda
+  const [sellerId, setSellerId] = useState('');
+  const [category, setCategory] = useState<SaleCategory>('Serviço Informática');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Pix');
+
+  // Estados de edição inline
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [editSellerId, setEditSellerId] = useState('');
+  const [editCategory, setEditCategory] = useState<SaleCategory>('Serviço Informática');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPrice, setEditPrice] = useState<string>('');
+  const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editPaymentMethod, setEditPaymentMethod] = useState<PaymentMethod>('Pix');
+  const [editDate, setEditDate] = useState('');
+
+  // Estados de busca e filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSeller, setFilterSeller] = useState('todos');
+  const [filterCategory, setFilterCategory] = useState('todas');
+  const [filterPayment, setFilterPayment] = useState('todos');
+
+  // Categorias e formas de pagamento fixas
+  const categories: SaleCategory[] = ['Serviço Informática', 'Serviço Celular', 'Serviço Externo', 'Outros'];
+  const paymentMethods: PaymentMethod[] = ['Dinheiro', 'Pix', 'Cartão de Crédito', 'Cartão de Débito', 'Outro'];
+
+  // Totalizar vendas por dia para o calendário-carrossel
+  const dayTotals = useMemo(() => {
+    const totals: { [date: string]: number } = {};
+    sales.forEach((s) => {
+      totals[s.date] = (totals[s.date] || 0) + s.value;
+    });
+    return totals;
+  }, [sales]);
+
+  // Filtrar vendas a serem exibidas
+  const filteredSales = useMemo(() => {
+    return sales.filter((s) => {
+      // 1. Filtro de data (se não for "Ver todos os dias")
+      if (!viewAllDays && s.date !== selectedDate) return false;
+      
+      // 2. Filtro por mês/ano ativo (no caso de ver todos os dias, as vendas já estão pré-filtradas no App.tsx para o mês correto, mas garantimos aqui)
+      const parts = s.date.split('-');
+      if (Number(parts[0]) !== selectedYear || Number(parts[1]) !== selectedMonth) return false;
+
+      // 3. Filtro de busca textual
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const sellerName = sellers.find(sel => sel.id === s.sellerId)?.name.toLowerCase() || '';
+        const matchDesc = s.description.toLowerCase().includes(query);
+        const matchSeller = sellerName.includes(query);
+        const matchCategory = s.category.toLowerCase().includes(query);
+        const matchPayment = s.paymentMethod.toLowerCase().includes(query);
+        if (!matchDesc && !matchSeller && !matchCategory && !matchPayment) return false;
+      }
+
+      // 4. Filtro de vendedor
+      if (filterSeller !== 'todos' && s.sellerId !== filterSeller) return false;
+
+      // 5. Filtro de categoria
+      if (filterCategory !== 'todas' && s.category !== filterCategory) return false;
+
+      // 6. Filtro de pagamento
+      if (filterPayment !== 'todos' && s.paymentMethod !== filterPayment) return false;
+
+      return true;
+    });
+  }, [sales, selectedDate, viewAllDays, selectedYear, selectedMonth, searchQuery, filterSeller, filterCategory, filterPayment, sellers]);
+
+  // Valor total das vendas listadas
+  const totalListedValue = useMemo(() => {
+    return filteredSales.reduce((acc, curr) => acc + curr.value, 0);
+  }, [filteredSales]);
+
+  // Função para cadastrar venda
+  const handleAddSaleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sellerId) {
+      alert('Por favor, selecione um vendedor.');
+      return;
+    }
+    if (!description.trim()) {
+      alert('Por favor, insira uma descrição.');
+      return;
+    }
+    const numPrice = parseFloat(price.replace(',', '.'));
+    if (isNaN(numPrice) || numPrice <= 0) {
+      alert('Por favor, insira um preço válido.');
+      return;
+    }
+
+    onAddSale({
+      date: selectedDate,
+      sellerId,
+      category,
+      description: description.trim(),
+      price: numPrice,
+      quantity,
+      value: numPrice * quantity,
+      paymentMethod,
+    });
+
+    // Resetar campos (mantendo vendedor e forma de pagamento para agilizar novos lançamentos)
+    setDescription('');
+    setPrice('');
+    setQuantity(1);
+  };
+
+  // Função para carregar dados na edição inline
+  const startEditSale = (sale: Sale) => {
+    setEditingSaleId(sale.id);
+    setEditSellerId(sale.sellerId);
+    setEditCategory(sale.category);
+    setEditDescription(sale.description);
+    setEditPrice(String(sale.price));
+    setEditQuantity(sale.quantity);
+    setEditPaymentMethod(sale.paymentMethod);
+    setEditDate(sale.date);
+  };
+
+  // Salvar edição inline
+  const handleSaveEditSale = () => {
+    if (!editSellerId || !editDescription.trim() || !editingSaleId) return;
+    const numPrice = parseFloat(editPrice.replace(',', '.'));
+    if (isNaN(numPrice) || numPrice <= 0) return;
+
+    onUpdateSale({
+      id: editingSaleId,
+      date: editDate,
+      sellerId: editSellerId,
+      category: editCategory,
+      description: editDescription.trim(),
+      price: numPrice,
+      quantity: editQuantity,
+      value: numPrice * editQuantity,
+      paymentMethod: editPaymentMethod,
+    });
+
+    setEditingSaleId(null);
+  };
+
+  // Retroceder ou avançar dia
+  const handlePrevDay = () => {
+    const idx = days.indexOf(selectedDate);
+    if (idx > 0) {
+      setSelectedDate(days[idx - 1]);
+      setViewAllDays(false);
+    }
+  };
+
+  const handleNextDay = () => {
+    const idx = days.indexOf(selectedDate);
+    if (idx < days.length - 1) {
+      setSelectedDate(days[idx + 1]);
+      setViewAllDays(false);
+    }
+  };
+
+  // Dynamic badge colors for sellers to match the Geometric Balance design spec
+  const getSellerBadgeStyle = (id: string) => {
+    const idx = sellers.findIndex(s => s.id === id);
+    if (idx === -1) return 'bg-slate-50 text-slate-600 border border-slate-100';
+    if (idx % 3 === 0) return 'bg-blue-50 text-blue-700 border border-blue-100/80';
+    if (idx % 3 === 1) return 'bg-emerald-50 text-emerald-700 border border-emerald-100/80';
+    return 'bg-purple-50 text-purple-700 border border-purple-100/80';
+  };
+
+  return (
+    <div className="space-y-6" id="daily-ledger-container">
+      {/* 1. SELETOR DE DIAS (CALENDÁRIO HORIZONTAL) */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm" id="calendar-carousel">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Dias do Mês ({days.length} dias)
+            </h3>
+          </div>
+          <button
+            onClick={() => {
+              setViewAllDays(!viewAllDays);
+            }}
+            id="view-all-days-btn"
+            className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              viewAllDays
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100/80'
+            }`}
+          >
+            {viewAllDays ? 'Visualizando Mês Completo' : 'Visualizar Mês Completo'}
+          </button>
+        </div>
+
+        {/* Listagem horizontal com scroll */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrevDay}
+            disabled={days.indexOf(selectedDate) === 0}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-all"
+            title="Dia Anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <div className="flex-1 flex gap-2 overflow-x-auto py-1 scrollbar-thin scrollbar-thumb-slate-200" id="horizontal-days-list">
+            {days.map((dateStr) => {
+              const isActive = selectedDate === dateStr && !viewAllDays;
+              const hasSales = dayTotals[dateStr] > 0;
+              const dayNum = formatDateDisplay(dateStr, true);
+              const wDay = getWeekdayName(dateStr);
+              const isWeekend = wDay === 'Sáb' || wDay === 'Dom';
+
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => {
+                    setSelectedDate(dateStr);
+                    setViewAllDays(false);
+                  }}
+                  className={`flex-none flex flex-col items-center justify-between w-14 py-2 border rounded-xl transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10 scale-105'
+                      : isWeekend
+                      ? 'bg-slate-50/50 border-slate-100 hover:border-slate-300 text-slate-500'
+                      : 'bg-white border-slate-200 hover:border-indigo-400 text-slate-700'
+                  }`}
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-indigo-100' : 'text-slate-400'}`}>
+                    {wDay}
+                  </span>
+                  <span className="text-base font-bold tracking-tight">{dayNum}</span>
+                  
+                  {/* Ponto indicador de venda ou valor */}
+                  <div className="h-1.5 mt-1 flex justify-center items-center">
+                    {hasSales ? (
+                      <span
+                        className={`block h-1.5 w-1.5 rounded-full ${
+                          isActive ? 'bg-white' : 'bg-emerald-500'
+                        }`}
+                        title={formatCurrency(dayTotals[dateStr])}
+                      ></span>
+                    ) : (
+                      <span className="block h-1 w-1 bg-transparent"></span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={handleNextDay}
+            disabled={days.indexOf(selectedDate) === days.length - 1}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-all"
+            title="Próximo Dia"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* 2. FORMULÁRIO DE LANÇAMENTO (ESQUERDA) */}
+        {!viewAllDays ? (
+          <div className="xl:col-span-1 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit" id="new-sale-form-card">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="h-4 w-4 text-indigo-600" />
+                Lançar na Caixa
+              </h3>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/50 px-2 py-0.5 rounded">
+                Dia {formatDateDisplay(selectedDate, true)}
+              </span>
+            </div>
+
+            {sellers.length === 0 ? (
+              <div className="p-4 bg-amber-50 text-amber-800 text-xs rounded-lg border border-amber-100">
+                Atenção: Você precisa cadastrar pelo menos um vendedor na aba <strong>Vendedores</strong> antes de lançar vendas.
+              </div>
+            ) : (
+              <form onSubmit={handleAddSaleSubmit} className="space-y-3.5">
+                {/* Vendedor */}
+                <div>
+                  <label htmlFor="sale-seller" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Vendedor *
+                  </label>
+                  <select
+                    id="sale-seller"
+                    required
+                    value={sellerId}
+                    onChange={(e) => setSellerId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                  >
+                    <option value="">Selecione o vendedor</option>
+                    {sellers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.commissionPercent}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Categoria do Serviço/Venda */}
+                <div>
+                  <label htmlFor="sale-category" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Tipo de Venda / Serviço *
+                  </label>
+                  <select
+                    id="sale-category"
+                    required
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as SaleCategory)}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Descrição do Item */}
+                <div>
+                  <label htmlFor="sale-desc" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Descrição do Item / Serviço *
+                  </label>
+                  <input
+                    id="sale-desc"
+                    type="text"
+                    required
+                    placeholder="Ex: Troca de Tela iPhone 11"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                  />
+                </div>
+
+                {/* Preço Unitário e Quantidade */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="sale-price" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Preço Unitário (R$) *
+                    </label>
+                    <input
+                      id="sale-price"
+                      type="text"
+                      required
+                      placeholder="0,00"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="sale-qty" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      Quantidade
+                    </label>
+                    <input
+                      id="sale-qty"
+                      type="number"
+                      required
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Forma de Pagamento */}
+                <div>
+                  <label htmlFor="sale-payment" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Forma de Pagamento *
+                  </label>
+                  <select
+                    id="sale-payment"
+                    required
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                  >
+                    {paymentMethods.map((pm) => (
+                      <option key={pm} value={pm}>
+                        {pm}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Mostrador de total provisório */}
+                {price && !isNaN(parseFloat(price.replace(',', '.'))) && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center text-xs">
+                    <span className="text-slate-500">Valor Calculado:</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatCurrency(parseFloat(price.replace(',', '.')) * quantity)}
+                    </span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  id="submit-sale-btn"
+                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer shadow-sm"
+                >
+                  <Plus className="h-4 w-4" /> Lançar Venda
+                </button>
+              </form>
+            )}
+          </div>
+        ) : null}
+
+        {/* 3. LISTAGEM DE LANÇAMENTOS (DIREITA) */}
+        <div className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col ${
+          viewAllDays ? 'xl:col-span-4' : 'xl:col-span-3'
+        }`} id="sales-list-card">
+          
+          {/* Cabeçalho da Lista + Filtros */}
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-700 tracking-tight flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-indigo-500" />
+                  {viewAllDays ? 'Lançamentos do Mês Completo' : `Lançamentos do dia ${formatDateDisplay(selectedDate)}`}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Mostrando {filteredSales.length} {filteredSales.length === 1 ? 'venda' : 'vendas'} | Total: <span className="font-bold text-indigo-600 font-mono">{formatCurrency(totalListedValue)}</span>
+                </p>
+              </div>
+
+              {/* Caixa de Busca Rápida */}
+              <div className="relative w-full sm:w-64">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Search className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Filtrar lançamentos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded outline-none bg-white focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Filtros rápidos colapsáveis */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+              <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Filter className="h-3 w-3 text-slate-400" /> Filtros:
+              </span>
+
+              {/* Filtro Vendedor */}
+              <select
+                value={filterSeller}
+                onChange={(e) => setFilterSeller(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="todos">Vendedor: Todos</option>
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Filtro Categoria */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="todas">Categoria: Todas</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+
+              {/* Filtro Pagamento */}
+              <select
+                value={filterPayment}
+                onChange={(e) => setFilterPayment(e.target.value)}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+              >
+                <option value="todos">Pagamento: Todos</option>
+                {paymentMethods.map((pm) => (
+                  <option key={pm} value={pm}>
+                    {pm}
+                  </option>
+                ))}
+              </select>
+
+              {/* Limpar Filtros se ativos */}
+              {(filterSeller !== 'todos' || filterCategory !== 'todas' || filterPayment !== 'todos' || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setFilterSeller('todos');
+                    setFilterCategory('todas');
+                    setFilterPayment('todos');
+                    setSearchQuery('');
+                  }}
+                  className="text-rose-600 hover:underline font-semibold text-[11px] cursor-pointer"
+                >
+                  Limpar Filtros
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tabela de Lançamentos */}
+          <div className="flex-1 overflow-x-auto">
+            {filteredSales.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-xs">
+                Nenhum lançamento encontrado para os filtros ativos.
+              </div>
+            ) : (
+              <table className="w-full border-collapse text-left text-xs text-slate-600">
+                <thead className="bg-white shadow-[0_1px_0_rgba(0,0,0,0.05)] text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                  <tr>
+                    {viewAllDays && <th className="px-4 py-3 w-16">Dia</th>}
+                    <th className="px-4 py-3 w-28">Vendedor</th>
+                    <th className="px-4 py-3 w-32">Tipo de Serviço</th>
+                    <th className="px-4 py-3">Descrição do Item</th>
+                    <th className="px-4 py-3 w-24 text-right">Preço</th>
+                    <th className="px-4 py-3 w-12 text-center">Qtd</th>
+                    <th className="px-4 py-3 w-24 text-right">Total</th>
+                    <th className="px-4 py-3 w-28">Pagamento</th>
+                    <th className="px-4 py-3 w-20 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredSales.map((sale) => {
+                    const isEditing = editingSaleId === sale.id;
+                    const sellerName = sellers.find(s => s.id === sale.sellerId)?.name || 'Desconhecido';
+
+                    return (
+                      <tr key={sale.id} className="hover:bg-slate-50/40 transition-colors">
+                        {/* Data (somente em visualização mensal) */}
+                        {viewAllDays && (
+                          <td className="px-4 py-2 font-mono text-slate-400 whitespace-nowrap">
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="px-1.5 py-0.5 border border-slate-200 rounded text-xs bg-white"
+                              />
+                            ) : (
+                              formatDateDisplay(sale.date, true)
+                            )}
+                          </td>
+                        )}
+
+                        {/* Vendedor */}
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <select
+                              value={editSellerId}
+                              onChange={(e) => setEditSellerId(e.target.value)}
+                              className="px-1 py-0.5 border border-slate-200 rounded text-xs bg-white"
+                            >
+                              {sellers.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold tracking-tight ${getSellerBadgeStyle(sale.sellerId)}`}>
+                              {sellerName}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Categoria */}
+                        <td className="px-4 py-2 whitespace-nowrap text-slate-600">
+                          {isEditing ? (
+                            <select
+                              value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value as SaleCategory)}
+                              className="px-1 py-0.5 border border-slate-200 rounded text-xs bg-white"
+                            >
+                              {categories.map((cat) => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            sale.category
+                          )}
+                        </td>
+
+                        {/* Descrição */}
+                        <td className="px-4 py-2 font-normal text-slate-900 max-w-xs truncate">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              className="w-full px-1.5 py-0.5 border border-slate-200 rounded text-xs bg-white"
+                            />
+                          ) : (
+                            sale.description
+                          )}
+                        </td>
+
+                        {/* Preço Unitário */}
+                        <td className="px-4 py-2 text-right whitespace-nowrap font-mono text-slate-600">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editPrice}
+                              onChange={(e) => setEditPrice(e.target.value)}
+                              className="w-16 px-1.5 py-0.5 border border-slate-200 rounded text-xs text-right bg-white"
+                            />
+                          ) : (
+                            formatCurrency(sale.price)
+                          )}
+                        </td>
+
+                        {/* Quantidade */}
+                        <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-slate-500">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              min="1"
+                              value={editQuantity}
+                              onChange={(e) => setEditQuantity(Number(e.target.value))}
+                              className="w-12 px-1 py-0.5 border border-slate-200 rounded text-xs text-center bg-white"
+                            />
+                          ) : (
+                            sale.quantity
+                          )}
+                        </td>
+
+                        {/* Total Venda */}
+                        <td className="px-4 py-2 text-right whitespace-nowrap font-semibold text-slate-900 font-mono">
+                          {isEditing ? (
+                            formatCurrency((parseFloat(editPrice.replace(',', '.')) || 0) * editQuantity)
+                          ) : (
+                            formatCurrency(sale.value)
+                          )}
+                        </td>
+
+                        {/* Forma Pagamento */}
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {isEditing ? (
+                            <select
+                              value={editPaymentMethod}
+                              onChange={(e) => setEditPaymentMethod(e.target.value as PaymentMethod)}
+                              className="px-1 py-0.5 border border-slate-200 rounded text-xs bg-white"
+                            >
+                              {paymentMethods.map((pm) => (
+                                <option key={pm} value={pm}>
+                                  {pm}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="px-2 py-0.5 border border-slate-200 rounded text-[10px] uppercase font-medium bg-slate-50/50 text-slate-600">
+                              {sale.paymentMethod}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ações */}
+                        <td className="px-4 py-2 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  onClick={handleSaveEditSale}
+                                  title="Salvar"
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingSaleId(null)}
+                                  title="Cancelar"
+                                  className="p-1 text-slate-400 hover:bg-slate-100 rounded transition-colors"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEditSale(sale)}
+                                  title="Editar Lançamento"
+                                  className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm('Excluir este lançamento de venda do livro caixa?')) {
+                                      onDeleteSale(sale.id);
+                                    }
+                                  }}
+                                  title="Excluir Lançamento"
+                                  className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Subtotal Footer da Tabela */}
+          <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs font-semibold text-slate-500">
+            <div className="flex gap-4">
+              <span>Lançamentos: {filteredSales.length}</span>
+              <span>Itens Vendidos: {filteredSales.reduce((acc, curr) => acc + curr.quantity, 0)}</span>
+            </div>
+            <div className="text-indigo-600 text-sm font-bold font-mono">
+              Subtotal: {formatCurrency(totalListedValue)}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

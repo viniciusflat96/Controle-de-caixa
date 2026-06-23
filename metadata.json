@@ -1,0 +1,6 @@
+{
+  "name": "Controle de Caixa e Vendas",
+  "description": "Planilha inteligente para controle de caixa diário, vendas de serviços e cálculo de comissões de vendedores com sincronização e relatórios completos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
