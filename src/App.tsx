@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Seller, Sale, ServiceOrder, Product } from './types';
+import { Seller, Sale, ServiceOrder, Product, Client, ProtectorCompatibility, Appointment } from './types';
 import { generateInitialData, MONTH_NAMES } from './utils';
 import SellersConfig from './components/SellersConfig';
 import DailyLedger from './components/DailyLedger';
@@ -12,16 +12,34 @@ import MonthlySummary from './components/MonthlySummary';
 import SheetsSync from './components/SheetsSync';
 import ServiceOrders from './components/ServiceOrders';
 import ProductsConfig from './components/ProductsConfig';
+import ClientsConfig from './components/ClientsConfig';
+import ProtectorsConfig from './components/ProtectorsConfig';
+import Assistance from './components/Assistance';
+import Appointments from './components/Appointments';
 import { 
   Users, FileText, BarChart3, Share2, Calendar, Database, 
-  User, ClipboardList, CheckCircle2, RefreshCw, Smartphone, Package
+  User, ClipboardList, CheckCircle2, RefreshCw, Smartphone, Package, Shield, LayoutGrid, HelpCircle, CalendarDays
 } from 'lucide-react';
 import {
   subscribeSellers, dbSaveSeller, dbDeleteSeller,
   subscribeSales, dbSaveSale, dbDeleteSale,
   subscribeServiceOrders, dbSaveServiceOrder, dbDeleteServiceOrder,
-  subscribeProducts, dbSaveProduct, dbDeleteProduct
+  subscribeProducts, dbSaveProduct, dbDeleteProduct,
+  subscribeClients, dbSaveClient, dbDeleteClient,
+  subscribeProtectors, dbSaveProtector, dbDeleteProtector,
+  subscribeSettings, dbSaveSettings,
+  subscribeAppointments, dbSaveAppointment, dbDeleteAppointment
 } from './firebase';
+import { AppSettings } from './types';
+
+const THEME_PALETTES: Record<string, Record<string, string>> = {
+  emerald: { '50': '#ecfdf5', '100': '#d1fae5', '200': '#a7f3d0', '300': '#6ee7b7', '400': '#34d399', '500': '#10b981', '600': '#059669', '700': '#047857', '800': '#065f46', '900': '#064e3b', '950': '#022c22' },
+  blue: { '50': '#eff6ff', '100': '#dbeafe', '200': '#bfdbfe', '300': '#93c5fd', '400': '#60a5fa', '500': '#3b82f6', '600': '#2563eb', '700': '#1d4ed8', '800': '#1e40af', '900': '#1e3a8a', '950': '#172554' },
+  indigo: { '50': '#eef2ff', '100': '#e0e7ff', '200': '#c7d2fe', '300': '#a5b4fc', '400': '#818cf8', '500': '#6366f1', '600': '#4f46e5', '700': '#4338ca', '800': '#3730a3', '900': '#312e81', '950': '#1e1b4b' },
+  violet: { '50': '#f5f3ff', '100': '#ede9fe', '200': '#ddd6fe', '300': '#c4b5fd', '400': '#a78bfa', '500': '#8b5cf6', '600': '#7c3aed', '700': '#6d28d9', '800': '#5b21b6', '900': '#4c1d95', '950': '#2e1065' },
+  rose: { '50': '#fff1f2', '100': '#ffe4e6', '200': '#fecdd3', '300': '#fda4af', '400': '#fb7185', '500': '#f43f5e', '600': '#e11d48', '700': '#be123c', '800': '#9f1239', '900': '#881337', '950': '#4c0519' },
+  amber: { '50': '#fffbeb', '100': '#fef3c7', '200': '#fde68a', '300': '#fcd34d', '400': '#fbbf24', '500': '#f59e0b', '600': '#d97706', '700': '#b45309', '800': '#92400e', '900': '#78350f', '950': '#451a03' }
+};
 
 export default function App() {
   // Inicialização de Vendedores via Firebase
@@ -41,9 +59,44 @@ export default function App() {
   // Inicialização de Mercadorias via Firebase
   const [products, setProducts] = useState<Product[]>([]);
 
+  // Inicialização de Clientes via Firebase
+  const [clients, setClients] = useState<Client[]>([]);
+
+  // Inicialização de Películas via Firebase
+  const [protectors, setProtectors] = useState<ProtectorCompatibility[]>([]);
+
+  // Inicialização de Agendamentos via Firebase
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+
   // Sincronização automática na nuvem a cada 5 cliques/ações
   const [clickCount, setClickCount] = useState<number>(0);
   const [showSyncToast, setShowSyncToast] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = subscribeSettings((data) => {
+      setSettings(data);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeAppointments((list) => {
+      setAppointments(list);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (settings && settings.themeColor) {
+      const palette = THEME_PALETTES[settings.themeColor] || THEME_PALETTES.emerald;
+      const root = document.documentElement;
+      Object.keys(palette).forEach((weight) => {
+        root.style.setProperty(`--theme-${weight}`, palette[weight]);
+      });
+    }
+  }, [settings?.themeColor]);
   const [toastMessage, setToastMessage] = useState<string>('');
 
   // Sincronizar dados em tempo real com Firebase Firestore
@@ -87,6 +140,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const unsub = subscribeClients((list) => {
+      setClients(list);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeProtectors((list) => {
+      setProtectors(list);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     if (storeLogo) {
       localStorage.setItem('caixa_store_logo', storeLogo);
     } else {
@@ -119,7 +186,7 @@ export default function App() {
   });
 
   // Controle de Abas
-  const [activeTab, setActiveTab] = useState<'livro-caixa' | 'ordens-servico' | 'produtos' | 'vendedores' | 'resumo' | 'sincronizacao'>('livro-caixa');
+  const [activeTab, setActiveTab] = useState<'livro-caixa' | 'ordens-servico' | 'agendamentos' | 'produtos' | 'clientes' | 'peliculas' | 'vendedores' | 'resumo' | 'sincronizacao' | 'ajuda'>('livro-caixa');
 
   const years = [2024, 2025, 2026, 2027, 2028];
 
@@ -196,11 +263,60 @@ export default function App() {
     dbDeleteProduct(id);
   };
 
+  // Métodos CRUD para Clientes com Firebase
+  const handleAddClient = (newClient: Omit<Client, 'id'>) => {
+    const id = `cli-${Date.now()}`;
+    dbSaveClient({ ...newClient, id });
+  };
+
+  const handleUpdateClient = (updatedClient: Client) => {
+    dbSaveClient(updatedClient);
+  };
+
+  const handleDeleteClient = (id: string) => {
+    dbDeleteClient(id);
+  };
+
+  // Métodos CRUD para Películas
+  const handleAddProtector = (newProtector: Omit<ProtectorCompatibility, 'id'>) => {
+    const id = `prot-${Date.now()}`;
+    dbSaveProtector({ ...newProtector, id });
+  };
+
+  const handleUpdateProtector = (updatedProtector: ProtectorCompatibility) => {
+    dbSaveProtector(updatedProtector);
+  };
+
+  const handleDeleteProtector = (id: string) => {
+    dbDeleteProtector(id);
+  };
+
+  // Métodos CRUD para Agendamentos
+  const handleAddAppointment = (newAppointment: Omit<Appointment, 'id'>) => {
+    const id = `app-${Date.now()}`;
+    dbSaveAppointment({ ...newAppointment, id });
+  };
+
+  const handleDeleteAppointment = (id: string) => {
+    dbDeleteAppointment(id);
+  };
+
   const totalAllTimeRevenue = useMemo(() => {
     return sales.reduce((acc, curr) => acc + curr.value, 0);
   }, [sales]);
 
   const activeMonthName = MONTH_NAMES[selectedMonth - 1];
+
+  const upcomingAppointmentsToday = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    return appointments.filter(app => {
+      // Retorna apenas agendamentos de hoje que ainda não passaram
+      if (app.date !== todayStr) return false;
+      return app.time >= nowTime;
+    }).sort((a, b) => a.time.localeCompare(b.time));
+  }, [appointments]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased flex flex-col" id="app-root">
@@ -266,6 +382,20 @@ export default function App() {
         </div>
       </header>
 
+      {/* BANNER DE AGENDAMENTOS DO DIA */}
+      {upcomingAppointmentsToday.length > 0 && (
+        <div className="bg-emerald-600 text-white px-4 py-2 text-xs font-bold flex flex-wrap items-center justify-center gap-4 animate-fade-in shadow-md relative z-10">
+          <CalendarDays className="h-4 w-4" />
+          <span>Atenção: Você tem {upcomingAppointmentsToday.length} agendamento(s) para hoje!</span>
+          <button 
+            onClick={() => setActiveTab('agendamentos')}
+            className="px-3 py-1 bg-white text-emerald-800 rounded-full hover:bg-emerald-50 transition-colors shadow-sm ml-2"
+          >
+            Ver Agenda
+          </button>
+        </div>
+      )}
+
       {/* TOAST DE SINCRONIZAÇÃO AUTOMÁTICA */}
       {showSyncToast && (
         <div className="fixed bottom-14 right-6 bg-slate-900 text-white px-4 py-3 rounded-xl border border-slate-800 shadow-2xl flex items-center gap-3 z-50 animate-bounce duration-700" id="sync-toast">
@@ -314,6 +444,18 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => { handleTriggerClick(); setActiveTab('agendamentos'); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'agendamentos'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <CalendarDays className="h-4.5 w-4.5 flex-none" />
+              Agendamentos
+            </button>
+
+            <button
               onClick={() => { handleTriggerClick(); setActiveTab('produtos'); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'produtos'
@@ -326,6 +468,30 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => { handleTriggerClick(); setActiveTab('clientes'); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'clientes'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <User className="h-4.5 w-4.5 flex-none" />
+              Clientes
+            </button>
+
+            <button
+              onClick={() => { handleTriggerClick(); setActiveTab('peliculas'); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'peliculas'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Smartphone className="h-4.5 w-4.5 flex-none" />
+              Películas Compatíveis
+            </button>
+
+            <button
               onClick={() => { handleTriggerClick(); setActiveTab('vendedores'); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'vendedores'
@@ -335,6 +501,18 @@ export default function App() {
             >
               <Users className="h-4 w-4 flex-none" />
               Vendedores e Ajustes
+            </button>
+
+            <button
+              onClick={() => { handleTriggerClick(); setActiveTab('ajuda'); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'ajuda'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <HelpCircle className="h-4.5 w-4.5 flex-none" />
+              Central de Ajuda
             </button>
 
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 block mb-3 mt-5">
@@ -380,6 +558,7 @@ export default function App() {
               sales={sales}
               sellers={sellers}
               products={products}
+              clients={clients}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               onAddSale={handleAddSale}
@@ -396,9 +575,41 @@ export default function App() {
               sellers={sellers}
               serviceOrders={serviceOrders}
               storeLogo={storeLogo}
+              settings={settings}
               onAddOS={handleAddOS}
               onUpdateOS={handleUpdateOS}
               onDeleteOS={handleDeleteOS}
+              triggerClick={handleTriggerClick}
+            />
+          )}
+
+          {activeTab === 'agendamentos' && (
+            <Appointments
+              appointments={appointments}
+              clients={clients}
+              sellers={sellers}
+              onAddAppointment={handleAddAppointment}
+              onDeleteAppointment={handleDeleteAppointment}
+              triggerClick={handleTriggerClick}
+            />
+          )}
+
+          {activeTab === 'clientes' && (
+            <ClientsConfig
+              clients={clients}
+              onAddClient={handleAddClient}
+              onUpdateClient={handleUpdateClient}
+              onDeleteClient={handleDeleteClient}
+              triggerClick={handleTriggerClick}
+            />
+          )}
+
+          {activeTab === 'peliculas' && (
+            <ProtectorsConfig
+              protectors={protectors}
+              onAddProtector={handleAddProtector}
+              onUpdateProtector={handleUpdateProtector}
+              onDeleteProtector={handleDeleteProtector}
               triggerClick={handleTriggerClick}
             />
           )}
@@ -407,10 +618,12 @@ export default function App() {
             <SellersConfig
               sellers={sellers}
               storeLogo={storeLogo}
+              settings={settings}
               onAddSeller={handleAddSeller}
               onUpdateSeller={handleUpdateSeller}
               onDeleteSeller={handleDeleteSeller}
               onUpdateStoreLogo={setStoreLogo}
+              onUpdateSettings={dbSaveSettings}
               triggerClick={handleTriggerClick}
             />
           )}
@@ -443,6 +656,10 @@ export default function App() {
               selectedMonth={selectedMonth}
               triggerClick={handleTriggerClick}
             />
+          )}
+
+          {activeTab === 'ajuda' && (
+            <Assistance onNavigate={(tab) => setActiveTab(tab)} triggerClick={handleTriggerClick} />
           )}
         </section>
       </main>

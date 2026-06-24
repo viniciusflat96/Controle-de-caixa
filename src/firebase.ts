@@ -13,7 +13,7 @@ import {
   onSnapshot,
   enableIndexedDbPersistence
 } from 'firebase/firestore';
-import { Seller, Sale, ServiceOrder, Product } from './types';
+import { Seller, Sale, ServiceOrder, Product, Client, ProtectorCompatibility, AppSettings, Appointment } from './types';
 
 const firebaseConfig = {
   projectId: "planar-agent-j8gvj",
@@ -130,6 +130,76 @@ export async function dbSaveProduct(product: Product) {
 
 export async function dbDeleteProduct(id: string) {
   await deleteDoc(doc(db, 'products', id));
+}
+
+// 5. CLIENTS
+const clientsCol = collection(db, 'clients');
+export function subscribeClients(onUpdate: (clients: Client[]) => void) {
+  return onSnapshot(clientsCol, (snapshot) => {
+    const list: Client[] = [];
+    snapshot.forEach((doc) => {
+      list.push(doc.data() as Client);
+    });
+    onUpdate(list);
+  }, (err) => console.error('Error listening to clients:', err));
+}
+export async function dbSaveClient(client: Client) {
+  await setDoc(doc(db, 'clients', client.id), client);
+}
+export async function dbDeleteClient(id: string) {
+  await deleteDoc(doc(db, 'clients', id));
+}
+
+// 6. PROTECTORS
+const protectorsCol = collection(db, 'protectors');
+export function subscribeProtectors(onUpdate: (protectors: ProtectorCompatibility[]) => void) {
+  return onSnapshot(protectorsCol, (snapshot) => {
+    const list: ProtectorCompatibility[] = [];
+    snapshot.forEach((doc) => {
+      list.push(doc.data() as ProtectorCompatibility);
+    });
+    onUpdate(list);
+  }, (err) => console.error('Error listening to protectors:', err));
+}
+export async function dbSaveProtector(protector: ProtectorCompatibility) {
+  await setDoc(doc(db, 'protectors', protector.id), protector);
+}
+export async function dbDeleteProtector(id: string) {
+  await deleteDoc(doc(db, 'protectors', id));
+}
+
+// 7. SETTINGS
+const settingsCol = collection(db, 'settings');
+export function subscribeSettings(onUpdate: (settings: AppSettings | null) => void) {
+  return onSnapshot(doc(settingsCol, 'main'), (docSnap) => {
+    if (docSnap.exists()) {
+      onUpdate(docSnap.data() as AppSettings);
+    } else {
+      onUpdate(null);
+    }
+  }, (err) => console.error('Error listening to settings:', err));
+}
+export async function dbSaveSettings(settings: AppSettings) {
+  await setDoc(doc(db, 'settings', settings.id), settings);
+}
+
+// ==========================================
+// APPOINTMENTS
+// ==========================================
+const appointmentsCol = collection(db, 'appointments');
+
+export function subscribeAppointments(onUpdate: (appointments: Appointment[]) => void) {
+  return onSnapshot(appointmentsCol, (snapshot) => {
+    const list: Appointment[] = [];
+    snapshot.forEach(doc => list.push(doc.data() as Appointment));
+    onUpdate(list);
+  }, (err) => console.error('Error listening to appointments:', err));
+}
+export async function dbSaveAppointment(appointment: Appointment) {
+  await setDoc(doc(db, 'appointments', appointment.id), appointment);
+}
+export async function dbDeleteAppointment(id: string) {
+  await deleteDoc(doc(db, 'appointments', id));
 }
 
 export { db };

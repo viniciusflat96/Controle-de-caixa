@@ -7,7 +7,21 @@ export interface Seller {
   id: string;
   name: string;
   commissionPercent: number; // Porcentagem (ex: 5 para 5%)
+  phone?: string;
+  email?: string;
 }
+
+export interface Appointment {
+  id: string;
+  clientId: string;
+  address: string;
+  service: string;
+  technicianId: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
+  notified?: boolean; // Se a notificação já foi mostrada perto do horário
+}
+
 
 export type SaleCategory = 'Serviço Informática' | 'Serviço Celular' | 'Serviço Externo' | 'Outros';
 
@@ -19,10 +33,12 @@ export interface ServiceOrder {
   id: string;
   osNumber: string; // Ex: OS-0001
   createdAt: string; // Data de criação
+  clientId?: string; // Reference to Client ID
   clientName: string;
   clientPhone: string;
   clientAddress?: string;
   clientCpf?: string;
+  deviceType?: string; // Celular, Computador, etc.
   device: string;
   model: string;
   patternLock?: number[]; // Array dos números de 1 a 9 desenhados no padrão
@@ -48,6 +64,27 @@ export interface Product {
   name: string;
   stockQuantity: number;
   price: number;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  cpf?: string;
+  address?: string;
+  birthDate?: string; // YYYY-MM-DD
+}
+
+export interface ProtectorCompatibility {
+  id: string;
+  name: string; // e.g. "iPhone 11 / XR"
+  compatibleModels: string[]; // e.g. ["iPhone 11", "iPhone XR"]
+}
+
+export interface AppSettings {
+  id: string; // always 'main'
+  themeColor: 'emerald' | 'blue' | 'indigo' | 'violet' | 'rose' | 'amber';
+  deviceTypes: string[];
 }
 
 export interface Sale {

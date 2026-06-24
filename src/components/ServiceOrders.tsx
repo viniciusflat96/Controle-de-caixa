@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ServiceOrder, Seller, OSStatus } from '../types';
+import { ServiceOrder, Seller, OSStatus, AppSettings } from '../types';
 import { formatCurrency, formatDateDisplay } from '../utils';
 import { 
   ClipboardList, Plus, Search, Filter, Printer, Trash2, Edit2, Eye, 
@@ -10,6 +10,7 @@ interface ServiceOrdersProps {
   sellers: Seller[];
   serviceOrders: ServiceOrder[];
   storeLogo: string;
+  settings?: AppSettings | null;
   onAddOS: (os: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt'>) => void;
   onUpdateOS: (os: ServiceOrder) => void;
   onDeleteOS: (id: string) => void;
@@ -20,6 +21,7 @@ export default function ServiceOrders({
   sellers,
   serviceOrders,
   storeLogo,
+  settings,
   onAddOS,
   onUpdateOS,
   onDeleteOS,
@@ -34,6 +36,7 @@ export default function ServiceOrders({
   const [clientPhone, setClientPhone] = useState('');
   const [clientAddress, setClientAddress] = useState('');
   const [clientCpf, setClientCpf] = useState('');
+  const [deviceType, setDeviceType] = useState('Celular');
   const [device, setDevice] = useState('');
   const [model, setModel] = useState('');
   const [patternLock, setPatternLock] = useState<number[]>([]);
@@ -85,6 +88,7 @@ export default function ServiceOrders({
     setClientPhone('');
     setClientAddress('');
     setClientCpf('');
+    setDeviceType('Celular');
     setDevice('');
     setModel('');
     setPatternLock([]);
@@ -124,6 +128,7 @@ export default function ServiceOrders({
     setClientPhone(os.clientPhone);
     setClientAddress(os.clientAddress || '');
     setClientCpf(os.clientCpf || '');
+    setDeviceType(os.deviceType || 'Celular');
     setDevice(os.device);
     setModel(os.model);
     setPatternLock(os.patternLock || []);
@@ -131,8 +136,8 @@ export default function ServiceOrders({
     setAccessories(os.accessories || '');
     setNotes(os.notes || '');
     setDefect(os.defect);
-    setBudget(os.budget);
-    setWhatWasDone(os.whatWasDone);
+    setBudget(os.budget || '');
+    setWhatWasDone(os.whatWasDone || '');
     setStatus(os.status);
     setValue(os.value.toString());
     setTechnicianId(os.technicianId || '');
@@ -155,6 +160,7 @@ export default function ServiceOrders({
       clientPhone,
       clientAddress: clientAddress || undefined,
       clientCpf: clientCpf || undefined,
+      deviceType,
       device,
       model,
       patternLock: patternLock.length > 0 ? patternLock : undefined,
@@ -292,41 +298,39 @@ export default function ServiceOrders({
         <title>Imprimir Ordem de Serviço ${os.osNumber}</title>
         <meta charset="utf-8" />
         <style>
-          @page { size: A4; margin: 15mm; }
-          body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; line-height: 1.3; color: #1f2937; margin: 0; padding: 0; }
+          @page { size: A4; margin: 10mm; }
+          body { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; line-height: 1.25; color: #000; margin: 0; padding: 0; font-weight: 500; }
           .os-container { max-width: 800px; margin: auto; }
-          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 15px; margin-bottom: 15px; }
-          .store-info { text-align: left; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+          .store-info { text-align: left; font-weight: bold; }
           .os-title { text-align: right; }
-          .os-number { font-size: 20px; font-weight: bold; color: #059669; }
-          .os-date { font-size: 11px; color: #6b7280; font-weight: 500; }
+          .os-number { font-size: 18px; font-weight: 900; color: #000; }
+          .os-date { font-size: 11px; color: #000; font-weight: bold; }
           
-          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-          .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-          .grid-left-right { display: grid; grid-template-columns: 2.5fr 1fr; gap: 15px; margin-bottom: 15px; }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+          .grid-left-right { display: grid; grid-template-columns: 2.5fr 1fr; gap: 8px; margin-bottom: 8px; }
 
-          .section { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background-color: #ffffff; }
-          .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; border-bottom: 1px solid #f3f4f6; padding-bottom: 5px; margin-bottom: 8px; }
+          .section { border: 2px solid #000; border-radius: 6px; padding: 6px; background-color: #fff; }
+          .section-title { font-size: 11px; font-weight: 900; text-transform: uppercase; color: #000; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 6px; }
           
-          .label-val { display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dotted #f3f4f6; pb: 2px; }
-          .label-val strong { color: #374151; font-size: 10px; }
-          .label-val span { font-weight: 500; }
+          .label-val { display: flex; justify-content: space-between; margin-bottom: 3px; border-bottom: 1px dotted #ccc; padding-bottom: 2px; }
+          .label-val strong { color: #000; font-size: 11px; font-weight: 900; }
+          .label-val span { font-weight: 700; color: #000; }
 
-          .block-text { margin-bottom: 6px; font-size: 10.5px; }
-          .block-text strong { display: block; font-size: 9px; text-transform: uppercase; color: #6b7280; margin-bottom: 2px; }
-          .block-text p { margin: 0; padding: 6px; background-color: #f9fafb; border-radius: 4px; border-left: 2px solid #059669; white-space: pre-wrap; font-size: 10px; color: #111827; }
+          .block-text { margin-bottom: 6px; font-size: 11px; font-weight: bold; }
+          .block-text strong { display: block; font-size: 10px; text-transform: uppercase; color: #000; margin-bottom: 2px; font-weight: 900; }
+          .block-text p { margin: 0; padding: 4px; background-color: #f9fafb; border: 1px solid #000; border-radius: 4px; border-left: 3px solid #000; white-space: pre-wrap; font-size: 11px; color: #000; }
 
-          .pattern-box { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 8px; background-color: #fafafa; }
-          .pattern-title { font-size: 8px; font-weight: bold; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; text-align: center; }
+          .warranty-box { margin-top: 8px; border: 2px solid #000; border-radius: 6px; padding: 6px; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 25px; margin-bottom: 10px; }
+          .sig-line { width: 45%; border-top: 1px solid #000; text-align: center; padding-top: 4px; font-size: 10px; color: #000; font-weight: bold; }
 
-          .warranty-box { margin-top: 15px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background-color: #f9fafb; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 40px; margin-bottom: 20px; }
-          .sig-line { width: 45%; border-top: 1px solid #9ca3af; text-align: center; padding-top: 5px; font-size: 9px; color: #4b5563; }
+          .divider-dashed { border-top: 2px dashed #000; margin: 15px 0; position: relative; }
+          .divider-tag { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); background-color: #ffffff; padding: 0 10px; font-size: 9px; font-weight: 900; color: #000; text-transform: uppercase; }
 
-          .divider-dashed { border-top: 1px dashed #9ca3af; margin: 40px 0; position: relative; }
-          .divider-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background-color: #ffffff; padding: 0 10px; font-size: 8px; font-weight: bold; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.1em; }
-
-          .badge-status { font-size: 10px; font-weight: bold; padding: 3px 8px; border-radius: 4px; display: inline-block; background-color: #e6f4ea; color: #059669; border: 1px solid #a7f3d0; text-transform: uppercase; }
+          .badge-status { font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 4px; display: inline-block; background-color: #000; color: #fff; text-transform: uppercase; margin-bottom: 2px; }
+          
+          ol { margin: 0; padding-left: 20px; font-size: 10px; font-weight: bold; color: #000; line-height: 1.3; }
         </style>
       </head>
       <body>
@@ -850,18 +854,36 @@ export default function ServiceOrders({
                   
                   {/* Lado Esquerdo: Campos de Texto */}
                   <div className="space-y-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                        Aparelho / Equipamento *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ex: Celular Motorola, Notebook Dell"
-                        value={device}
-                        onChange={(e) => setDevice(e.target.value)}
-                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
-                      />
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Tipo de Equipamento *
+                        </label>
+                        <select
+                          required
+                          value={deviceType}
+                          onChange={(e) => setDeviceType(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
+                        >
+                          {(settings?.deviceTypes?.length ? settings.deviceTypes : ['Celular', 'Notebook', 'Computador', 'Tablet', 'Console']).map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Marca / Fabricante *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Apple, Samsung, Dell"
+                          value={device}
+                          onChange={(e) => setDevice(e.target.value)}
+                          className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
+                        />
+                      </div>
                     </div>
 
                     <div>

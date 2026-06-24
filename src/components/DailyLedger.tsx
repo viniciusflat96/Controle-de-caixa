@@ -4,17 +4,18 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Sale, Seller, SaleCategory, PaymentMethod, Product } from '../types';
+import { Sale, Seller, SaleCategory, PaymentMethod, Product, Client } from '../types';
 import { getDaysInMonth, formatDateDisplay, getWeekdayName, formatCurrency } from '../utils';
 import { 
   Plus, Trash2, Calendar, FileText, Filter, Search, 
-  ChevronLeft, ChevronRight, Edit3, X, Check, ArrowUpRight, ArrowRight, Package 
+  ChevronLeft, ChevronRight, Edit3, X, Check, ArrowUpRight, ArrowRight, Package, Gift
 } from 'lucide-react';
 
 interface DailyLedgerProps {
   sales: Sale[];
   sellers: Seller[];
   products: Product[];
+  clients: Client[];
   selectedYear: number;
   selectedMonth: number; // 1-indexed
   onAddSale: (sale: Omit<Sale, 'id'>) => void;
@@ -29,6 +30,7 @@ export default function DailyLedger({
   sales,
   sellers,
   products,
+  clients,
   selectedYear,
   selectedMonth,
   onAddSale,
@@ -99,6 +101,37 @@ export default function DailyLedger({
   // Categorias e formas de pagamento fixas
   const categories: SaleCategory[] = ['Serviço Informática', 'Serviço Celular', 'Serviço Externo', 'Outros'];
   const paymentMethods: PaymentMethod[] = ['Dinheiro', 'Pix', 'Cartão de Crédito', 'Cartão de Débito', 'Outro'];
+
+  // Aniversariantes da semana
+  const upcomingBirthdays = useMemo(() => {
+    if (!clients) return [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const in7Days = new Date(today);
+    in7Days.setDate(today.getDate() + 7);
+
+    return clients.filter(c => {
+      if (!c.birthDate) return false;
+      const bDate = new Date(c.birthDate);
+      bDate.setUTCHours(12, 0, 0, 0); // avoid tz shift
+      
+      const bMonth = bDate.getUTCMonth();
+      const bDay = bDate.getUTCDate();
+      
+      const nextBirthdayThisYear = new Date(today.getFullYear(), bMonth, bDay);
+      if (nextBirthdayThisYear < today) {
+        nextBirthdayThisYear.setFullYear(today.getFullYear() + 1);
+      }
+      return nextBirthdayThisYear >= today && nextBirthdayThisYear <= in7Days;
+    }).map(c => {
+      const bDate = new Date(c.birthDate!);
+      bDate.setUTCHours(12, 0, 0, 0);
+      return {
+        ...c,
+        bDateObj: new Date(today.getFullYear(), bDate.getUTCMonth(), bDate.getUTCDate())
+      };
+    }).sort((a, b) => a.bDateObj.getTime() - b.bDateObj.getTime());
+  }, [clients]);
 
   // Totalizar vendas por dia para o calendário-carrossel
   const dayTotals = useMemo(() => {
@@ -256,6 +289,26 @@ export default function DailyLedger({
 
   return (
     <div className="space-y-6" id="daily-ledger-container">
+      {/* AVISO DE ANIVERSARIANTES */}
+      {upcomingBirthdays.length > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm animate-fade-in flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Gift className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-amber-800">Lembrete de Aniversários (Próximos 7 dias)</h4>
+              <ul className="mt-2 space-y-1">
+                {upcomingBirthdays.map(c => (
+                  <li key={c.id} className="text-xs text-amber-700">
+                    <span className="font-semibold">{c.name}</span> - {c.bDateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                    {c.phone ? ` (Cel: ${c.phone})` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. SELETOR DE DIAS (CALENDÁRIO HORIZONTAL) */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm" id="calendar-carousel">
         <div className="flex items-center justify-between mb-3">
