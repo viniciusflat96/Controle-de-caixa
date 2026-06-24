@@ -13,6 +13,7 @@ interface SheetsSyncProps {
   sellers: Seller[];
   selectedYear: number;
   selectedMonth: number;
+  triggerClick: () => void;
 }
 
 export default function SheetsSync({
@@ -20,6 +21,7 @@ export default function SheetsSync({
   sellers,
   selectedYear,
   selectedMonth,
+  triggerClick,
 }: SheetsSyncProps) {
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
   const [spreadsheetId, setSpreadsheetId] = useState('');
@@ -34,80 +36,151 @@ export default function SheetsSync({
     });
   }, [sales, selectedYear, selectedMonth]);
 
-  // Função para exportar CSV (Livro Caixa completo do mês)
-  const handleExportCSV = () => {
-    if (activeMonthSales.length === 0) {
-      alert('Não há vendas registradas para exportar neste mês.');
-      return;
+  // Função para exportar Excel Formatado (Tamanho 14, Negrito, Dividido, Visualmente Lindo!)
+  const handleExportStyledExcel = (type: 'sales' | 'commissions') => {
+    triggerClick();
+    const monthStr = String(selectedMonth).padStart(2, '0');
+    let title = '';
+    let filename = '';
+    let tableHTML = '';
+
+    if (type === 'sales') {
+      if (activeMonthSales.length === 0) {
+        alert('Não há vendas registradas para exportar neste mês.');
+        return;
+      }
+      title = `Controle de Caixa Diário - Mês ${monthStr}/${selectedYear}`;
+      filename = `Controle_Caixa_Formatado_${selectedYear}_${monthStr}.xls`;
+
+      // Gerar cabeçalho e linhas
+      const headers = ['Data', 'Vendedor', 'Categoria', 'Descrição do Lançamento', 'Preço Unitário', 'Qtd', 'Total Lançado', 'Forma de Pagamento'];
+      const rowsHTML = activeMonthSales.map((s) => {
+        const sellerName = sellers.find((sel) => sel.id === s.sellerId)?.name || 'Desconhecido';
+        return `
+          <tr>
+            <td style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${formatDateDisplay(s.date)}</td>
+            <td style="font-size: 14pt; font-weight: bold; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${sellerName}</td>
+            <td style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${s.category}</td>
+            <td style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${s.description}</td>
+            <td style="font-size: 14pt; text-align: right; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Consolas', monospace;">${formatCurrency(s.price)}</td>
+            <td style="font-size: 14pt; text-align: center; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${s.quantity}</td>
+            <td style="font-size: 14pt; text-align: right; font-weight: bold; color: #15803d; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Consolas', monospace;">${formatCurrency(s.value)}</td>
+            <td style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 10px; font-family: 'Segoe UI', Arial, sans-serif;">${s.paymentMethod}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const totalRevenue = activeMonthSales.reduce((acc, curr) => acc + curr.value, 0);
+
+      tableHTML = `
+        <table style="border-collapse: collapse; width: 100%; border: 1px solid #cbd5e1;">
+          <thead>
+            <tr style="background-color: #059669; color: #ffffff;">
+              ${headers.map(h => `<th style="font-size: 14pt; font-weight: bold; border: 1px solid #cbd5e1; padding: 12px; text-align: left; font-family: 'Segoe UI', Arial, sans-serif;">${h}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+            <tr style="background-color: #f0fdf4; font-weight: bold;">
+              <td colspan="6" style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-family: 'Segoe UI', Arial, sans-serif;">FATURAMENTO TOTAL DO MÊS:</td>
+              <td style="font-size: 14pt; text-align: right; color: #166534; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Consolas', monospace;">${formatCurrency(totalRevenue)}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 12px;"></td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+    } else {
+      if (sellers.length === 0) {
+        alert('Não há vendedores cadastrados para exportar comissões.');
+        return;
+      }
+      title = `Relatório de Comissões e Vendas - Mês ${monthStr}/${selectedYear}`;
+      filename = `Comissoes_Vendedores_Formatado_${selectedYear}_${monthStr}.xls`;
+
+      const salesBySeller: { [sellerId: string]: number } = {};
+      activeMonthSales.forEach((s) => {
+        salesBySeller[s.sellerId] = (salesBySeller[s.sellerId] || 0) + s.value;
+      });
+
+      const headers = ['Vendedor', 'Porcentagem de Comissão', 'Faturamento Individual', 'Comissão Devida (Valor Líquido)'];
+      const rowsHTML = sellers.map((seller) => {
+        const salesTotal = salesBySeller[seller.id] || 0;
+        const commission = (salesTotal * seller.commissionPercent) / 100;
+        return `
+          <tr>
+            <td style="font-size: 14pt; font-weight: bold; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Segoe UI', Arial, sans-serif;">${seller.name}</td>
+            <td style="font-size: 14pt; text-align: center; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Segoe UI', Arial, sans-serif; font-weight: bold; color: #047857;">${seller.commissionPercent}%</td>
+            <td style="font-size: 14pt; text-align: right; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Consolas', monospace;">${formatCurrency(salesTotal)}</td>
+            <td style="font-size: 14pt; text-align: right; font-weight: bold; color: #166534; background-color: #f0fdf4; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Consolas', monospace;">${formatCurrency(commission)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const totalRevenue = activeMonthSales.reduce((acc, curr) => acc + curr.value, 0);
+      const totalCommissions = sellers.reduce((acc, curr) => {
+        const salesTotal = salesBySeller[curr.id] || 0;
+        return acc + ((salesTotal * curr.commissionPercent) / 100);
+      }, 0);
+
+      tableHTML = `
+        <table style="border-collapse: collapse; width: 100%; border: 1px solid #cbd5e1;">
+          <thead>
+            <tr style="background-color: #059669; color: #ffffff;">
+              ${headers.map(h => `<th style="font-size: 14pt; font-weight: bold; border: 1px solid #cbd5e1; padding: 12px; text-align: left; font-family: 'Segoe UI', Arial, sans-serif;">${h}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+            <tr style="background-color: #f8fafc; font-weight: bold;">
+              <td colspan="2" style="font-size: 14pt; border: 1px solid #cbd5e1; padding: 12px; text-align: right; font-family: 'Segoe UI', Arial, sans-serif;">RESUMO DO FECHAMENTO:</td>
+              <td style="font-size: 14pt; text-align: right; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Consolas', monospace;">Faturamento: ${formatCurrency(totalRevenue)}</td>
+              <td style="font-size: 14pt; text-align: right; color: #166534; background-color: #ecfdf5; border: 1px solid #cbd5e1; padding: 12px; font-family: 'Consolas', monospace;">Total Comissões: ${formatCurrency(totalCommissions)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
     }
 
-    const headers = ['Data', 'Vendedor', 'Categoria', 'Descricao do Item', 'Preco Unitario', 'Quantidade', 'Valor Total', 'Forma de Pagamento'];
-    const rows = activeMonthSales.map((s) => {
-      const sellerName = sellers.find((sel) => sel.id === s.sellerId)?.name || 'Desconhecido';
-      return [
-        formatDateDisplay(s.date),
-        sellerName,
-        s.category,
-        s.description.replace(/"/g, '""'), // Escapar aspas duplas
-        s.price.toFixed(2).replace('.', ','),
-        s.quantity,
-        s.value.toFixed(2).replace('.', ','),
-        s.paymentMethod,
-      ];
-    });
+    // Gerar documento HTML completo que o Excel interpreta com as fontes de tamanho 14 e negritos desejados!
+    const excelDocument = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>${type === 'sales' ? 'Livro Caixa' : 'Comissoes'}</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+      </head>
+      <body style="padding: 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+        <h2 style="font-size: 18pt; font-weight: bold; color: #065f46; margin-bottom: 5px; font-family: 'Segoe UI', Arial, sans-serif;">
+          ${title}
+        </h2>
+        <p style="font-size: 11pt; color: #64748b; margin-bottom: 20px; font-family: 'Segoe UI', Arial, sans-serif;">
+          Gerado em ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')} - Sistema de Gestão de Caixa
+        </p>
+        <hr style="border: none; border-top: 2px solid #059669; margin-bottom: 20px;">
+        ${tableHTML}
+      </body>
+      </html>
+    `;
 
-    // Juntar cabeçalho e linhas com ponto e vírgula (formato Excel / Sheets brasileiro padrão)
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map((row) => row.map((field) => `"${field}"`).join(';')),
-    ].join('\n');
-
-    // Forçar encode UTF-8 BOM para abrir corretamente no Excel e Google Sheets com acentos
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Forçar encode UTF-8 e baixar com formato de arquivo compatível Excel
+    const blob = new Blob(['\uFEFF' + excelDocument], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Controle_Caixa_${selectedYear}_${String(selectedMonth).padStart(2, '0')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Função para exportar Comissões de Vendedores em CSV
-  const handleExportCommissionsCSV = () => {
-    if (sellers.length === 0) {
-      alert('Não há vendedores cadastrados.');
-      return;
-    }
-
-    // Calcular comissões
-    const salesBySeller: { [sellerId: string]: number } = {};
-    activeMonthSales.forEach((s) => {
-      salesBySeller[s.sellerId] = (salesBySeller[s.sellerId] || 0) + s.value;
-    });
-
-    const headers = ['Vendedor', 'Porcentagem Comissão', 'Volume Total de Vendas (R$)', 'Comissão a Pagar (R$)'];
-    const rows = sellers.map((seller) => {
-      const salesTotal = salesBySeller[seller.id] || 0;
-      const commission = (salesTotal * seller.commissionPercent) / 100;
-      return [
-        seller.name,
-        `${seller.commissionPercent}%`,
-        salesTotal.toFixed(2).replace('.', ','),
-        commission.toFixed(2).replace('.', ','),
-      ];
-    });
-
-    const csvContent = [
-      headers.join(';'),
-      ...rows.map((row) => row.map((field) => `"${field}"`).join(';')),
-    ].join('\n');
-
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Comissoes_Vendedores_${selectedYear}_${String(selectedMonth).padStart(2, '0')}.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -116,6 +189,7 @@ export default function SheetsSync({
   // Função mágica para copiar dados formatados em TSV (Tab-Separated Values).
   // O usuário pode colar diretamente em qualquer célula do Google Sheets ou Excel pressionando Ctrl+V!
   const handleCopyToClipboard = (type: 'sales' | 'commissions') => {
+    triggerClick();
     let textToCopy = '';
 
     if (type === 'sales') {
@@ -177,6 +251,7 @@ export default function SheetsSync({
 
   // Simular sincronização direta no Google Sheets caso não consiga autenticar
   const handleSimulatedSync = () => {
+    triggerClick();
     setIsSyncing(true);
     setSyncStatus('idle');
     
@@ -193,11 +268,11 @@ export default function SheetsSync({
       {/* Cabeçalho */}
       <div className="border-b border-slate-200 pb-5">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          <Share2 className="h-5 w-5 text-indigo-600" />
+          <Share2 className="h-5 w-5 text-emerald-600" />
           Exportar e Sincronizar
         </h2>
         <p className="text-xs text-slate-500 mt-1">
-          Integre seus lançamentos diários e comissões com o Google Sheets, exporte planilhas Excel ou copie os dados diretamente.
+          Integre seus lançamentos diários e comissões com o Google Sheets, exporte planilhas Excel formatadas ou copie os dados diretamente.
         </p>
       </div>
 
@@ -207,27 +282,27 @@ export default function SheetsSync({
           {/* Card Exportação Instantânea */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4" id="csv-export-box">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Download className="h-4.5 w-4.5 text-indigo-500" />
-              Baixar Arquivos de Planilha (Excel / Google Sheets)
+              <Download className="h-4.5 w-4.5 text-emerald-600" />
+              Baixar Planilhas Formatadas (Excel com Fonte 14, Negrito e Bem Dividido!)
             </h3>
 
-            <p className="text-xs text-slate-500">
-              Faça o download de arquivos em formato <strong>CSV de alta compatibilidade</strong>. Você pode abri-los no Excel, LibreOffice ou importá-los diretamente no Google Drive.
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Exportação especial em conformidade com as configurações solicitadas: Planilhas contendo tabelas bem-divididas com <strong>linhas delimitadas por bordas nítidas, textos de tamanho 14pt (legível), destaques em negrito nas colunas críticas e cabeçalhos em verde esmeralda</strong>.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
-                onClick={handleExportCSV}
-                className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border border-indigo-200/50 font-semibold py-2.5 px-4 rounded-lg text-xs transition-all cursor-pointer"
+                onClick={() => handleExportStyledExcel('sales')}
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200/50 font-bold py-3 px-4 rounded-lg text-xs transition-all cursor-pointer shadow-xs"
               >
-                <FileSpreadsheet className="h-4 w-4" /> Exportar Livro Caixa do Mês (CSV)
+                <FileSpreadsheet className="h-4 w-4" /> Baixar Caixa Formatado (14pt, Negrito)
               </button>
 
               <button
-                onClick={handleExportCommissionsCSV}
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200/50 font-semibold py-2.5 px-4 rounded-lg text-xs transition-all cursor-pointer"
+                onClick={() => handleExportStyledExcel('commissions')}
+                className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200/50 font-bold py-3 px-4 rounded-lg text-xs transition-all cursor-pointer shadow-xs"
               >
-                <Download className="h-4 w-4" /> Exportar Comissões do Mês (CSV)
+                <Download className="h-4 w-4" /> Baixar Comissões Formatadas (14pt, Negrito)
               </button>
             </div>
           </div>
@@ -235,13 +310,13 @@ export default function SheetsSync({
           {/* Card Copiar e Colar Inteligente (Tabulado para Planilha) */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4" id="clipboard-copy-box">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Table className="h-4.5 w-4.5 text-indigo-500" />
+              <Table className="h-4.5 w-4.5 text-emerald-600" />
               Super Copiar e Colar (Sem Configuração!)
             </h3>
 
-            <div className="p-3.5 bg-indigo-50/50 rounded-lg border border-indigo-100/50 flex items-start gap-2.5">
-              <Info className="h-4.5 w-4.5 text-indigo-600 mt-0.5 flex-none" />
-              <div className="text-xs text-indigo-950 leading-relaxed">
+            <div className="p-3.5 bg-emerald-50/50 rounded-lg border border-emerald-100/50 flex items-start gap-2.5">
+              <Info className="h-4.5 w-4.5 text-emerald-600 mt-0.5 flex-none" />
+              <div className="text-xs text-emerald-950 leading-relaxed">
                 <strong>Como funciona:</strong> Ao clicar nos botões abaixo, os dados são formatados exatamente como uma grade de planilha. Basta abrir qualquer aba do seu Google Sheets, selecionar a primeira célula (A1) e pressionar <strong>Ctrl + V</strong> (ou Cmd + V). As colunas e linhas serão preenchidas perfeitamente de forma instantânea!
               </div>
             </div>
@@ -254,7 +329,7 @@ export default function SheetsSync({
                 {copiedIndex === 'sales' ? (
                   <>
                     <Check className="h-4 w-4 text-emerald-600 animate-bounce" />
-                    <span className="text-emerald-600">Copiado para o Google Sheets!</span>
+                    <span className="text-emerald-600 font-bold">Copiado para o Google Sheets!</span>
                   </>
                 ) : (
                   <>
@@ -271,7 +346,7 @@ export default function SheetsSync({
                 {copiedIndex === 'commissions' ? (
                   <>
                     <Check className="h-4 w-4 text-emerald-600 animate-bounce" />
-                    <span className="text-emerald-600">Copiadas para o Google Sheets!</span>
+                    <span className="text-emerald-600 font-bold">Copiadas para o Google Sheets!</span>
                   </>
                 ) : (
                   <>
@@ -288,7 +363,7 @@ export default function SheetsSync({
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" id="g-sheets-sync-card">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-              <Cloud className="h-4.5 w-4.5 text-indigo-500" />
+              <Cloud className="h-4.5 w-4.5 text-emerald-600" />
               Sincronização em Nuvem
             </h3>
 
@@ -303,14 +378,14 @@ export default function SheetsSync({
                   placeholder="Cole o ID da planilha do navegador"
                   value={spreadsheetId}
                   onChange={(e) => setSpreadsheetId(e.target.value)}
-                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
                 />
               </div>
 
               <button
                 onClick={handleSimulatedSync}
                 disabled={isSyncing}
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Cloud className="h-4 w-4 animate-pulse" />
                 {isSyncing ? 'Sincronizando...' : 'Sincronizar Lançamentos'}

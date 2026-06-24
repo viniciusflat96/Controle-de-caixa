@@ -5,20 +5,26 @@
 
 import React, { useState } from 'react';
 import { Seller } from '../types';
-import { Plus, Trash2, Edit2, Check, X, Users, Award } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Users, Award, Image, Upload, Trash } from 'lucide-react';
 
 interface SellersConfigProps {
   sellers: Seller[];
+  storeLogo: string;
   onAddSeller: (seller: Omit<Seller, 'id'>) => void;
   onUpdateSeller: (seller: Seller) => void;
   onDeleteSeller: (id: string) => void;
+  onUpdateStoreLogo: (logoBase64: string) => void;
+  triggerClick: () => void;
 }
 
 export default function SellersConfig({
   sellers,
+  storeLogo,
   onAddSeller,
   onUpdateSeller,
   onDeleteSeller,
+  onUpdateStoreLogo,
+  triggerClick,
 }: SellersConfigProps) {
   const [name, setName] = useState('');
   const [commissionPercent, setCommissionPercent] = useState<number>(10);
@@ -30,6 +36,7 @@ export default function SellersConfig({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    triggerClick();
     if (!name.trim()) return;
     onAddSeller({
       name: name.trim(),
@@ -40,12 +47,14 @@ export default function SellersConfig({
   };
 
   const startEdit = (seller: Seller) => {
+    triggerClick();
     setEditingId(seller.id);
     setEditName(seller.name);
     setEditCommission(seller.commissionPercent);
   };
 
   const handleSaveEdit = () => {
+    triggerClick();
     if (!editName.trim() || !editingId) return;
     onUpdateSeller({
       id: editingId,
@@ -55,20 +64,40 @@ export default function SellersConfig({
     setEditingId(null);
   };
 
+  // Processar upload de arquivo para logo
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerClick();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      onUpdateStoreLogo(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    triggerClick();
+    onUpdateStoreLogo('');
+  };
+
   return (
     <div className="space-y-6" id="sellers-config-container">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Users className="h-5 w-5 text-indigo-600" />
-            Configuração de Vendedores
+            <Users className="h-5 w-5 text-emerald-600" />
+            Configurações e Vendedores
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Cadastre os vendedores da loja e defina suas respectivas porcentagens de comissão de vendas.
+            Cadastre os vendedores da loja, defina as comissões e adicione o logotipo personalizado para as ordens de serviço.
           </p>
         </div>
       </div>
 
+      {/* Grid Superior: Vendedores e Formulário */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulário de cadastro */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" id="add-seller-form-card">
@@ -89,7 +118,7 @@ export default function SellersConfig({
                 placeholder="Ex: Carlos Eduardo"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
               />
             </div>
 
@@ -107,7 +136,7 @@ export default function SellersConfig({
                   step="0.5"
                   value={commissionPercent}
                   onChange={(e) => setCommissionPercent(Number(e.target.value))}
-                  className="w-full pl-3 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white font-mono"
+                  className="w-full pl-3 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white font-mono"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <span className="text-slate-400 text-xs">%</span>
@@ -118,7 +147,7 @@ export default function SellersConfig({
             <button
               type="submit"
               id="submit-seller-btn"
-              className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer shadow-sm"
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer shadow-sm"
             >
               <Plus className="h-4 w-4" /> Cadastrar Vendedor
             </button>
@@ -129,7 +158,7 @@ export default function SellersConfig({
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" id="sellers-list-card">
           <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
             <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Award className="h-4 w-4 text-indigo-500" />
+              <Award className="h-4 w-4 text-emerald-500" />
               Equipe de Vendas ({sellers.length})
             </h3>
           </div>
@@ -157,7 +186,7 @@ export default function SellersConfig({
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
+                            className="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-500 bg-white"
                           />
                         ) : (
                           <div className="font-bold text-slate-900">{seller.name}</div>
@@ -174,12 +203,12 @@ export default function SellersConfig({
                               step="0.5"
                               value={editCommission}
                               onChange={(e) => setEditCommission(Number(e.target.value))}
-                              className="w-16 px-1.5 py-1 text-xs border border-slate-200 rounded text-center focus:outline-none focus:border-indigo-500 bg-white font-mono"
+                              className="w-16 px-1.5 py-1 text-xs border border-slate-200 rounded text-center focus:outline-none focus:border-emerald-500 bg-white font-mono"
                             />
                             <span className="text-slate-400 font-mono">%</span>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 font-bold text-indigo-600 bg-indigo-50/80 border border-indigo-100/50 px-2.5 py-0.5 rounded-full text-[11px]">
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-600 bg-emerald-50/80 border border-emerald-100/50 px-2.5 py-0.5 rounded-full text-[11px]">
                             {seller.commissionPercent}%
                           </span>
                         )}
@@ -209,13 +238,14 @@ export default function SellersConfig({
                               <button
                                 onClick={() => startEdit(seller)}
                                 title="Editar"
-                                className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                               >
                                 <Edit2 className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => {
                                   if (window.confirm(`Deseja realmente remover o vendedor ${seller.name}?`)) {
+                                    triggerClick();
                                     onDeleteSeller(seller.id);
                                   }
                                 }}
@@ -236,6 +266,74 @@ export default function SellersConfig({
           )}
         </div>
       </div>
+
+      {/* SEÇÃO: CONFIGURAÇÃO DE LOGO DA LOJA */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
+        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
+          <Image className="h-4.5 w-4.5 text-emerald-600" />
+          Identidade Visual & Logotipo da Loja
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          
+          {/* Lado Esquerdo: Upload e instruções */}
+          <div className="md:col-span-2 space-y-2.5">
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Adicione o logotipo oficial da sua assistência técnica para personalizar o cabeçalho superior esquerdo da aplicação e ser impresso de forma automática nas vias de <strong>Ordem de Serviço (OS)</strong> e recibos de garantia dos clientes.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-700 border border-emerald-200/50 font-bold py-2 px-3.5 rounded-lg text-xs transition-colors cursor-pointer shadow-xs">
+                <Upload className="h-3.5 w-3.5" />
+                <span>Escolher Imagem Logo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {storeLogo && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/50 font-bold py-2 px-3.5 rounded-lg text-xs transition-colors cursor-pointer shadow-xs"
+                >
+                  <Trash className="h-3.5 w-3.5" />
+                  Remover Logo
+                </button>
+              )}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              Formatos recomendados: PNG ou JPG com fundo transparente ou branco. Proporção retangular horizontal (ex: 300x80px).
+            </div>
+          </div>
+
+          {/* Lado Direito: Preview da logo atual */}
+          <div className="border border-slate-200/80 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-center min-h-[120px]">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+              Visualização Prévia
+            </span>
+            {storeLogo ? (
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200/50 shadow-inner flex items-center justify-center max-w-full">
+                <img
+                  src={storeLogo}
+                  alt="Logo da loja"
+                  className="max-h-[60px] object-contain"
+                />
+              </div>
+            ) : (
+              <div className="text-center text-slate-400 py-4">
+                <Image className="h-8 w-8 text-slate-300 mx-auto mb-1.5" />
+                <span className="text-[10.5px] italic">Sem logotipo ativo (usando texto padrão)</span>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
     </div>
   );
 }
+

@@ -13,6 +13,30 @@ export type SaleCategory = 'Serviço Informática' | 'Serviço Celular' | 'Servi
 
 export type PaymentMethod = 'Dinheiro' | 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito' | 'Outro';
 
+export type OSStatus = 'Nova' | 'Orçamento' | 'Aprovada' | 'Em Reparo' | 'Pronta' | 'Entregue' | 'Sem Conserto';
+
+export interface ServiceOrder {
+  id: string;
+  osNumber: string; // Ex: OS-0001
+  createdAt: string; // Data de criação
+  clientName: string;
+  clientPhone: string;
+  clientAddress?: string;
+  clientCpf?: string;
+  device: string;
+  model: string;
+  patternLock?: number[]; // Array dos números de 1 a 9 desenhados no padrão
+  textPassword?: string;
+  accessories?: string;
+  notes?: string;
+  defect: string; // Máx 600 caracteres
+  budget: string; // Máx 300 caracteres
+  whatWasDone: string; // Máx 500 caracteres
+  status: OSStatus;
+  value: number; // Valor total do serviço
+  technicianId?: string; // Vendedor/Técnico responsável
+}
+
 export interface Sale {
   id: string;
   date: string; // Formato YYYY-MM-DD

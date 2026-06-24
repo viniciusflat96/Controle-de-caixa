@@ -16,6 +16,7 @@ interface DailyLedgerProps {
   onAddSale: (sale: Omit<Sale, 'id'>) => void;
   onUpdateSale: (sale: Sale) => void;
   onDeleteSale: (id: string) => void;
+  triggerClick: () => void;
 }
 
 export default function DailyLedger({
@@ -26,6 +27,7 @@ export default function DailyLedger({
   onAddSale,
   onUpdateSale,
   onDeleteSale,
+  triggerClick,
 }: DailyLedgerProps) {
   // Lista de dias do mês selecionado
   const days = useMemo(() => getDaysInMonth(selectedYear, selectedMonth), [selectedYear, selectedMonth]);
@@ -217,20 +219,21 @@ export default function DailyLedger({
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm" id="calendar-carousel">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-indigo-600" />
+            <Calendar className="h-5 w-5 text-emerald-600" />
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Dias do Mês ({days.length} dias)
             </h3>
           </div>
           <button
             onClick={() => {
+              triggerClick();
               setViewAllDays(!viewAllDays);
             }}
             id="view-all-days-btn"
             className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
               viewAllDays
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100/80'
+                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/10'
+                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80'
             }`}
           >
             {viewAllDays ? 'Visualizando Mês Completo' : 'Visualizar Mês Completo'}
@@ -240,7 +243,10 @@ export default function DailyLedger({
         {/* Listagem horizontal com scroll */}
         <div className="flex items-center gap-2">
           <button
-            onClick={handlePrevDay}
+            onClick={() => {
+              triggerClick();
+              handlePrevDay();
+            }}
             disabled={days.indexOf(selectedDate) === 0}
             className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-all"
             title="Dia Anterior"
@@ -260,18 +266,19 @@ export default function DailyLedger({
                 <button
                   key={dateStr}
                   onClick={() => {
+                    triggerClick();
                     setSelectedDate(dateStr);
                     setViewAllDays(false);
                   }}
                   className={`flex-none flex flex-col items-center justify-between w-14 py-2 border rounded-xl transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/10 scale-105'
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/10 scale-105'
                       : isWeekend
                       ? 'bg-slate-50/50 border-slate-100 hover:border-slate-300 text-slate-500'
-                      : 'bg-white border-slate-200 hover:border-indigo-400 text-slate-700'
+                      : 'bg-white border-slate-200 hover:border-emerald-400 text-slate-700'
                   }`}
                 >
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-indigo-100' : 'text-slate-400'}`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
                     {wDay}
                   </span>
                   <span className="text-base font-bold tracking-tight">{dayNum}</span>
@@ -295,7 +302,10 @@ export default function DailyLedger({
           </div>
 
           <button
-            onClick={handleNextDay}
+            onClick={() => {
+              triggerClick();
+              handleNextDay();
+            }}
             disabled={days.indexOf(selectedDate) === days.length - 1}
             className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-all"
             title="Próximo Dia"
@@ -305,16 +315,16 @@ export default function DailyLedger({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* 2. FORMULÁRIO DE LANÇAMENTO (ESQUERDA) */}
         {!viewAllDays ? (
           <div className="xl:col-span-1 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 h-fit" id="new-sale-form-card">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Plus className="h-4 w-4 text-indigo-600" />
+                <Plus className="h-4 w-4 text-emerald-600" />
                 Lançar na Caixa
               </h3>
-              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100/50 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100/50 px-2 py-0.5 rounded">
                 Dia {formatDateDisplay(selectedDate, true)}
               </span>
             </div>
@@ -335,7 +345,7 @@ export default function DailyLedger({
                     required
                     value={sellerId}
                     onChange={(e) => setSellerId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
                   >
                     <option value="">Selecione o vendedor</option>
                     {sellers.map((s) => (
@@ -356,7 +366,7 @@ export default function DailyLedger({
                     required
                     value={category}
                     onChange={(e) => setCategory(e.target.value as SaleCategory)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
                   >
                     {categories.map((cat) => (
                       <option key={cat} value={cat}>
@@ -369,17 +379,20 @@ export default function DailyLedger({
                 {/* Descrição do Item */}
                 <div>
                   <label htmlFor="sale-desc" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Descrição do Item / Serviço *
+                    Descrição Detalhada do Item / Serviço *
                   </label>
-                  <input
+                  <textarea
                     id="sale-desc"
-                    type="text"
                     required
-                    placeholder="Ex: Troca de Tela iPhone 11"
+                    rows={3}
+                    placeholder="Ex: Troca de Tela iPhone 11 - Original com Garantia"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white resize-none"
                   />
+                  <span className="text-[10px] text-slate-400 block mt-1">
+                    Campo expandido para digitação de produtos e detalhes.
+                  </span>
                 </div>
 
                 {/* Preço Unitário e Quantidade */}
@@ -395,7 +408,7 @@ export default function DailyLedger({
                       placeholder="0,00"
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white font-mono"
                     />
                   </div>
 
@@ -410,7 +423,7 @@ export default function DailyLedger({
                       min="1"
                       value={quantity}
                       onChange={(e) => setQuantity(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white font-mono"
                     />
                   </div>
                 </div>
@@ -425,7 +438,7 @@ export default function DailyLedger({
                     required
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white"
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
                   >
                     {paymentMethods.map((pm) => (
                       <option key={pm} value={pm}>
@@ -448,7 +461,7 @@ export default function DailyLedger({
                 <button
                   type="submit"
                   id="submit-sale-btn"
-                  className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-colors cursor-pointer shadow-sm"
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition-colors cursor-pointer shadow-sm"
                 >
                   <Plus className="h-4 w-4" /> Lançar Venda
                 </button>
@@ -467,11 +480,11 @@ export default function DailyLedger({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-700 tracking-tight flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-indigo-500" />
+                  <FileText className="h-4 w-4 text-emerald-600" />
                   {viewAllDays ? 'Lançamentos do Mês Completo' : `Lançamentos do dia ${formatDateDisplay(selectedDate)}`}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Mostrando {filteredSales.length} {filteredSales.length === 1 ? 'venda' : 'vendas'} | Total: <span className="font-bold text-indigo-600 font-mono">{formatCurrency(totalListedValue)}</span>
+                  Mostrando {filteredSales.length} {filteredSales.length === 1 ? 'venda' : 'vendas'} | Total: <span className="font-bold text-emerald-600 font-mono">{formatCurrency(totalListedValue)}</span>
                 </p>
               </div>
 
@@ -485,7 +498,7 @@ export default function DailyLedger({
                   placeholder="Filtrar lançamentos..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded outline-none bg-white focus:border-indigo-500 transition-colors"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded outline-none bg-white focus:border-emerald-500 transition-colors"
                 />
               </div>
             </div>
@@ -499,8 +512,8 @@ export default function DailyLedger({
               {/* Filtro Vendedor */}
               <select
                 value={filterSeller}
-                onChange={(e) => setFilterSeller(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+                onChange={(e) => { triggerClick(); setFilterSeller(e.target.value); }}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-emerald-500"
               >
                 <option value="todos">Vendedor: Todos</option>
                 {sellers.map((s) => (
@@ -513,8 +526,8 @@ export default function DailyLedger({
               {/* Filtro Categoria */}
               <select
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+                onChange={(e) => { triggerClick(); setFilterCategory(e.target.value); }}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-emerald-500"
               >
                 <option value="todas">Categoria: Todas</option>
                 {categories.map((cat) => (
@@ -527,8 +540,8 @@ export default function DailyLedger({
               {/* Filtro Pagamento */}
               <select
                 value={filterPayment}
-                onChange={(e) => setFilterPayment(e.target.value)}
-                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-500"
+                onChange={(e) => { triggerClick(); setFilterPayment(e.target.value); }}
+                className="px-2.5 py-1 bg-white border border-slate-200 rounded text-xs focus:outline-none focus:border-emerald-500"
               >
                 <option value="todos">Pagamento: Todos</option>
                 {paymentMethods.map((pm) => (
@@ -735,15 +748,19 @@ export default function DailyLedger({
                             ) : (
                               <>
                                 <button
-                                  onClick={() => startEditSale(sale)}
+                                  onClick={() => {
+                                    triggerClick();
+                                    startEditSale(sale);
+                                  }}
                                   title="Editar Lançamento"
-                                  className="p-1 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                                 >
                                   <Edit3 className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   onClick={() => {
                                     if (window.confirm('Excluir este lançamento de venda do livro caixa?')) {
+                                      triggerClick();
                                       onDeleteSale(sale.id);
                                     }
                                   }}
@@ -770,7 +787,7 @@ export default function DailyLedger({
               <span>Lançamentos: {filteredSales.length}</span>
               <span>Itens Vendidos: {filteredSales.reduce((acc, curr) => acc + curr.quantity, 0)}</span>
             </div>
-            <div className="text-indigo-600 text-sm font-bold font-mono">
+            <div className="text-emerald-600 text-sm font-bold font-mono">
               Subtotal: {formatCurrency(totalListedValue)}
             </div>
           </div>

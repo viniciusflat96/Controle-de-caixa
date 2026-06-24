@@ -13,6 +13,7 @@ interface MonthlySummaryProps {
   sellers: Seller[];
   selectedYear: number;
   selectedMonth: number;
+  triggerClick: () => void;
 }
 
 export default function MonthlySummary({
@@ -20,6 +21,7 @@ export default function MonthlySummary({
   sellers,
   selectedYear,
   selectedMonth,
+  triggerClick,
 }: MonthlySummaryProps) {
   
   // 1. Estatísticas Gerais
@@ -119,7 +121,7 @@ export default function MonthlySummary({
       {/* Título de Cabeçalho */}
       <div className="border-b border-slate-200 pb-5">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-indigo-600" />
+          <TrendingUp className="h-5 w-5 text-emerald-600" />
           Resumo e Fechamento de Caixa
         </h2>
         <p className="text-xs text-slate-500 mt-1">
@@ -136,7 +138,7 @@ export default function MonthlySummary({
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Faturamento Geral</span>
-            <span className="text-xl font-bold text-slate-900 tracking-tight block mt-0.5 font-mono">
+            <span className="text-xl font-bold text-emerald-600 tracking-tight block mt-0.5 font-mono">
               {formatCurrency(stats.totalRevenue)}
             </span>
           </div>
@@ -144,7 +146,7 @@ export default function MonthlySummary({
 
         {/* Card Lançamentos */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <CheckCircle2 className="h-6 w-6" />
           </div>
           <div>
@@ -216,7 +218,7 @@ export default function MonthlySummary({
                   <tr key={c.id} className="hover:bg-slate-50/40 transition-colors">
                     <td className="px-6 py-3.5 font-bold text-slate-900">{c.name}</td>
                     <td className="px-6 py-3.5 text-center font-medium">
-                      <span className="inline-block bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-100/50">
+                      <span className="inline-block bg-emerald-50 text-emerald-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-100/50">
                         {c.commissionPercent}%
                       </span>
                     </td>
@@ -248,7 +250,7 @@ export default function MonthlySummary({
         {/* Métodos de Recebimento */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" id="payments-report-card">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-            <PieChart className="h-4 w-4 text-indigo-500" />
+            <PieChart className="h-4 w-4 text-emerald-500" />
             Faturamento por Forma de Pagamento
           </h3>
 
@@ -269,7 +271,7 @@ export default function MonthlySummary({
                   {/* Barra de Progresso Customizada */}
                   <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
+                      className="bg-emerald-600 h-full rounded-full transition-all duration-500" 
                       style={{ width: `${pct}%` }}
                     ></div>
                   </div>
@@ -282,7 +284,7 @@ export default function MonthlySummary({
         {/* Tipos de Serviços */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4" id="categories-report-card">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-            <Briefcase className="h-4 w-4 text-indigo-500" />
+            <Briefcase className="h-4 w-4 text-emerald-500" />
             Faturamento por Categoria de Lançamento
           </h3>
 
@@ -305,7 +307,7 @@ export default function MonthlySummary({
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
                         category === 'Serviço Informática'
-                          ? 'bg-indigo-500'
+                          ? 'bg-emerald-600'
                           : category === 'Serviço Celular'
                           ? 'bg-amber-500'
                           : category === 'Serviço Externo'
@@ -326,7 +328,7 @@ export default function MonthlySummary({
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" id="daily-breakdown-report-card">
         <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-            <Calendar className="h-4 w-4 text-indigo-500" />
+            <Calendar className="h-4 w-4 text-emerald-500" />
             Faturamento Diário Consolidado
           </h3>
           <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total: {allDaysOfMonth.length} dias</span>
@@ -356,14 +358,14 @@ export default function MonthlySummary({
                     <div 
                       className={`w-full rounded-t-md transition-all duration-500 ${
                         hasSales 
-                          ? 'bg-indigo-600 group-hover:bg-indigo-500 shadow-sm' 
+                          ? 'bg-emerald-600 group-hover:bg-emerald-500 shadow-sm' 
                           : 'bg-slate-100 border-dashed border border-slate-200'
                       }`}
                       style={{ height: `${Math.max(percentage, hasSales ? 5 : 2.5)}%` }}
                     ></div>
                     
                     {/* Rótulo do dia */}
-                    <span className="text-[10px] text-slate-400 font-semibold mt-1.5 group-hover:text-indigo-600">
+                    <span className="text-[10px] text-slate-400 font-semibold mt-1.5 group-hover:text-emerald-600">
                       {dayNum}
                     </span>
                   </div>
@@ -403,7 +405,7 @@ export default function MonthlySummary({
                     <td className="px-6 py-2 text-slate-500">{wDay}</td>
                     <td className="px-6 py-2 text-center font-mono">
                       {salesCount > 0 ? (
-                        <span className="inline-block bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-bold border border-indigo-100/50">
+                        <span className="inline-block bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-100/50">
                           {salesCount}
                         </span>
                       ) : (
@@ -425,7 +427,7 @@ export default function MonthlySummary({
           <span>FECHAMENTO DO MÊS</span>
           <div className="flex gap-6 font-mono">
             <span>{stats.totalSalesCount} lançamentos</span>
-            <span className="text-indigo-600 text-sm">{formatCurrency(stats.totalRevenue)}</span>
+            <span className="text-emerald-600 text-sm">{formatCurrency(stats.totalRevenue)}</span>
           </div>
         </div>
 
