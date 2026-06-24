@@ -35,6 +35,19 @@ export interface ServiceOrder {
   status: OSStatus;
   value: number; // Valor total do serviço
   technicianId?: string; // Vendedor/Técnico responsável
+  
+  // Pedido de Peça
+  partRequired?: boolean;
+  partName?: string;
+  partLink?: string;
+  partDeliveryTime?: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  stockQuantity: number;
+  price: number;
 }
 
 export interface Sale {

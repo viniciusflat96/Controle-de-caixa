@@ -47,6 +47,12 @@ export default function ServiceOrders({
   const [value, setValue] = useState('');
   const [technicianId, setTechnicianId] = useState('');
 
+  // Pedido de peças (Encomendar peça para OS)
+  const [partRequired, setPartRequired] = useState(false);
+  const [partName, setPartName] = useState('');
+  const [partLink, setPartLink] = useState('');
+  const [partDeliveryTime, setPartDeliveryTime] = useState('');
+
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
@@ -91,6 +97,10 @@ export default function ServiceOrders({
     setStatus('Nova');
     setValue('');
     setTechnicianId('');
+    setPartRequired(false);
+    setPartName('');
+    setPartLink('');
+    setPartDeliveryTime('');
     setEditingOS(null);
   };
 
@@ -126,6 +136,10 @@ export default function ServiceOrders({
     setStatus(os.status);
     setValue(os.value.toString());
     setTechnicianId(os.technicianId || '');
+    setPartRequired(os.partRequired || false);
+    setPartName(os.partName || '');
+    setPartLink(os.partLink || '');
+    setPartDeliveryTime(os.partDeliveryTime || '');
     setIsFormOpen(true);
   };
 
@@ -153,6 +167,10 @@ export default function ServiceOrders({
       status,
       value: numericValue,
       technicianId: technicianId || undefined,
+      partRequired,
+      partName: partRequired ? partName : undefined,
+      partLink: partRequired ? partLink : undefined,
+      partDeliveryTime: partRequired ? partDeliveryTime : undefined,
     };
 
     if (editingOS) {
@@ -1068,6 +1086,67 @@ export default function ServiceOrders({
                 </div>
               </div>
 
+              {/* SESSÃO 4.5: PEDIDO DE PEÇA / ENCOMENDA */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3.5">
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs select-none">
+                  <input
+                    type="checkbox"
+                    checked={partRequired}
+                    onChange={(e) => {
+                      triggerClick();
+                      setPartRequired(e.target.checked);
+                    }}
+                    className="h-4 w-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span>⚠️ Preciso encomendar/pedir uma peça especial para este cliente?</span>
+                </label>
+
+                {partRequired && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2 animate-fade-in">
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Nome da Peça *
+                      </label>
+                      <input
+                        type="text"
+                        required={partRequired}
+                        placeholder="Ex: Conector de carga iPhone 11"
+                        value={partName}
+                        onChange={(e) => setPartName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Link do Fornecedor / Anúncio (Opcional)
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="Ex: https://produto.mercadolivre.com.br/..."
+                        value={partLink}
+                        onChange={(e) => setPartLink(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="md:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        Tempo Estimado de Entrega *
+                      </label>
+                      <input
+                        type="text"
+                        required={partRequired}
+                        placeholder="Ex: 5 a 7 dias úteis, Chega amanhã"
+                        value={partDeliveryTime}
+                        onChange={(e) => setPartDeliveryTime(e.target.value)}
+                        className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* SESSÃO 5: VALORES, TÉCNICO E STATUS */}
               <div className="space-y-3.5 pt-2">
                 <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 flex items-center gap-1">
@@ -1292,6 +1371,31 @@ export default function ServiceOrders({
                   <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Laudo do Técnico / O que foi Feito</span>
                   <p className="text-slate-800 bg-slate-50/50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">{isViewing.whatWasDone || 'Aparelho aguardando início de reparos'}</p>
                 </div>
+
+                {isViewing.partRequired && (
+                  <div className="border-l-3 border-amber-500 bg-amber-50/35 p-3 rounded-lg border border-amber-200/50 space-y-1.5 animate-fade-in">
+                    <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest block flex items-center gap-1">
+                      <span>📦 Peça Especial Solicitada para este Reparo</span>
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
+                      <div><strong>Peça:</strong> <span className="font-semibold text-slate-900">{isViewing.partName}</span></div>
+                      <div><strong>Prazo estimado:</strong> <span className="font-semibold text-slate-900">{isViewing.partDeliveryTime}</span></div>
+                      {isViewing.partLink && (
+                        <div className="sm:col-span-2">
+                          <strong>Link do fornecedor:</strong>{' '}
+                          <a 
+                            href={isViewing.partLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-emerald-600 font-medium hover:underline inline-flex items-center gap-0.5"
+                          >
+                            Abrir Link de Compra 🔗
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Status, Técnico e Valor */}

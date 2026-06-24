@@ -4,29 +4,38 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Sale, Seller, SaleCategory, PaymentMethod } from '../types';
+import { Sale, Seller, SaleCategory, PaymentMethod, Product } from '../types';
 import { getDaysInMonth, formatDateDisplay, getWeekdayName, formatCurrency } from '../utils';
-import { Plus, Trash2, Calendar, FileText, Filter, Search, ChevronLeft, ChevronRight, Edit3, X, Check } from 'lucide-react';
+import { 
+  Plus, Trash2, Calendar, FileText, Filter, Search, 
+  ChevronLeft, ChevronRight, Edit3, X, Check, ArrowUpRight, ArrowRight, Package 
+} from 'lucide-react';
 
 interface DailyLedgerProps {
   sales: Sale[];
   sellers: Seller[];
+  products: Product[];
   selectedYear: number;
   selectedMonth: number; // 1-indexed
   onAddSale: (sale: Omit<Sale, 'id'>) => void;
   onUpdateSale: (sale: Sale) => void;
   onDeleteSale: (id: string) => void;
+  onAddProduct: (product: Omit<Product, 'id'>) => void;
+  onUpdateProduct: (product: Product) => void;
   triggerClick: () => void;
 }
 
 export default function DailyLedger({
   sales,
   sellers,
+  products,
   selectedYear,
   selectedMonth,
   onAddSale,
   onUpdateSale,
   onDeleteSale,
+  onAddProduct,
+  onUpdateProduct,
   triggerClick,
 }: DailyLedgerProps) {
   // Lista de dias do mês selecionado
@@ -51,6 +60,25 @@ export default function DailyLedger({
   const [price, setPrice] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Pix');
+
+  // Estados para integração com Mercadorias (Autocomplete e Quick Register)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showAutocomplete, setShowAutocomplete] = useState<boolean>(false);
+  
+  // Modal de cadastro rápido de mercadoria
+  const [isQuickRegOpen, setIsQuickRegOpen] = useState(false);
+  const [quickRegName, setQuickRegName] = useState('');
+  const [quickRegPrice, setQuickRegPrice] = useState('');
+  const [quickRegStock, setQuickRegStock] = useState<number | ''>('');
+
+  const matchingProducts = useMemo(() => {
+    if (!description.trim()) return [];
+    return products.filter((p) => p.name.toLowerCase().includes(description.toLowerCase()));
+  }, [products, description]);
+
+  const exactMatchExists = useMemo(() => {
+    return products.some((p) => p.name.toLowerCase() === description.trim().toLowerCase());
+  }, [products, description]);
 
   // Estados de edição inline
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
@@ -148,10 +176,23 @@ export default function DailyLedger({
       paymentMethod,
     });
 
+    // Verificar se a venda corresponde a uma mercadoria cadastrada para atualizar o estoque
+    const matchingProduct = products.find(
+      (p) => p.name.toLowerCase() === description.trim().toLowerCase()
+    );
+    if (matchingProduct) {
+      const updatedStock = Math.max(0, matchingProduct.stockQuantity - quantity);
+      onUpdateProduct({
+        ...matchingProduct,
+        stockQuantity: updatedStock
+      });
+    }
+
     // Resetar campos (mantendo vendedor e forma de pagamento para agilizar novos lançamentos)
     setDescription('');
     setPrice('');
     setQuantity(1);
+    setSelectedProductId(null);
   };
 
   // Função para carregar dados na edição inline
@@ -377,21 +418,75 @@ export default function DailyLedger({
                 </div>
 
                 {/* Descrição do Item */}
-                <div>
-                  <label htmlFor="sale-desc" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Descrição Detalhada do Item / Serviço *
-                  </label>
-                  <textarea
-                    id="sale-desc"
-                    required
-                    rows={3}
-                    placeholder="Ex: Troca de Tela iPhone 11 - Original com Garantia"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white resize-none"
-                  />
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="sale-desc" className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Descrição Detalhada do Item / Serviço *
+                    </label>
+                    {description.trim().length > 1 && !exactMatchExists && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickRegName(description.trim());
+                          setQuickRegPrice('');
+                          setQuickRegStock('');
+                          setIsQuickRegOpen(true);
+                        }}
+                        title="Cadastrar esta mercadoria"
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5 transition-all cursor-pointer bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 animate-pulse"
+                      >
+                        <ArrowUpRight className="h-3 w-3" /> Cadastrar Mercadoria
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="relative">
+                    <textarea
+                      id="sale-desc"
+                      required
+                      rows={3}
+                      placeholder="Comece a digitar o nome da mercadoria ou digite o serviço..."
+                      value={description}
+                      onChange={(e) => {
+                        setDescription(e.target.value);
+                        setShowAutocomplete(true);
+                      }}
+                      onFocus={() => setShowAutocomplete(true)}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 bg-white resize-none"
+                    />
+                    
+                    {/* Autocomplete Dropdown */}
+                    {showAutocomplete && matchingProducts.length > 0 && (
+                      <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-100">
+                        {matchingProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setDescription(p.name);
+                              setPrice(p.price.toString().replace('.', ','));
+                              setCategory('Outros'); // Default category for physical products, or let user adjust
+                              setSelectedProductId(p.id);
+                              setShowAutocomplete(false);
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-slate-50 transition-colors flex items-center justify-between text-xs cursor-pointer"
+                          >
+                            <div>
+                              <span className="font-bold text-slate-800">{p.name}</span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                Estoque: <span className={`font-extrabold ${p.stockQuantity === 1 ? 'text-red-500' : p.stockQuantity === 0 ? 'text-slate-400' : 'text-slate-600'}`}>{p.stockQuantity} un</span>
+                              </span>
+                            </div>
+                            <span className="font-bold text-emerald-600 font-mono">
+                              {formatCurrency(p.price)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-[10px] text-slate-400 block mt-1">
-                    Campo expandido para digitação de produtos e detalhes.
+                    Autocompleta se o produto estiver cadastrado. Setinha no canto permite cadastrar novo instantaneamente.
                   </span>
                 </div>
 
@@ -794,6 +889,111 @@ export default function DailyLedger({
 
         </div>
       </div>
+
+      {/* QUICK PRODUCT REGISTER MODAL */}
+      {isQuickRegOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-scale-up">
+            <div className="bg-emerald-600 text-white p-4 flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <Package className="h-4.5 w-4.5" />
+                Cadastrar Nova Mercadoria Instantaneamente
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setIsQuickRegOpen(false)}
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                triggerClick();
+                if (!quickRegName.trim()) return;
+                const parsedPrice = parseFloat(quickRegPrice.replace(',', '.')) || 0;
+                const parsedStock = Number(quickRegStock) || 0;
+
+                onAddProduct({
+                  name: quickRegName.trim(),
+                  stockQuantity: parsedStock,
+                  price: parsedPrice,
+                });
+
+                // Auto-fill form in DailyLedger
+                setDescription(quickRegName.trim());
+                setPrice(quickRegPrice);
+                setCategory('Outros');
+
+                setIsQuickRegOpen(false);
+              }}
+              className="p-5 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Nome da Mercadoria
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={quickRegName}
+                  onChange={(e) => setQuickRegName(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Preço de Venda (R$)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0,00"
+                    value={quickRegPrice}
+                    onChange={(e) => setQuickRegPrice(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 bg-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Qtd em Estoque Inicial
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="0"
+                    value={quickRegStock}
+                    onChange={(e) => setQuickRegStock(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-emerald-500 bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickRegOpen(false)}
+                  className="px-4 py-2 hover:bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-600 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  <Check className="h-4 w-4" /> Salvar & Selecionar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

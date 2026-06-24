@@ -4,130 +4,87 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Seller, Sale, ServiceOrder } from './types';
+import { Seller, Sale, ServiceOrder, Product } from './types';
 import { generateInitialData, MONTH_NAMES } from './utils';
 import SellersConfig from './components/SellersConfig';
 import DailyLedger from './components/DailyLedger';
 import MonthlySummary from './components/MonthlySummary';
 import SheetsSync from './components/SheetsSync';
 import ServiceOrders from './components/ServiceOrders';
+import ProductsConfig from './components/ProductsConfig';
 import { 
   Users, FileText, BarChart3, Share2, Calendar, Database, 
-  User, ClipboardList, CheckCircle2, RefreshCw, Smartphone
+  User, ClipboardList, CheckCircle2, RefreshCw, Smartphone, Package
 } from 'lucide-react';
+import {
+  subscribeSellers, dbSaveSeller, dbDeleteSeller,
+  subscribeSales, dbSaveSale, dbDeleteSale,
+  subscribeServiceOrders, dbSaveServiceOrder, dbDeleteServiceOrder,
+  subscribeProducts, dbSaveProduct, dbDeleteProduct
+} from './firebase';
 
 export default function App() {
-  // Inicialização de Vendedores
-  const [sellers, setSellers] = useState<Seller[]>(() => {
-    try {
-      const saved = localStorage.getItem('caixa_sellers');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Erro ao ler vendedores do localStorage:', e);
-    }
-    const { defaultSellers } = generateInitialData();
-    return defaultSellers;
-  });
+  // Inicialização de Vendedores via Firebase
+  const [sellers, setSellers] = useState<Seller[]>([]);
 
-  // Inicialização de Vendas
-  const [sales, setSales] = useState<Sale[]>(() => {
-    try {
-      const saved = localStorage.getItem('caixa_sales');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Erro ao ler vendas do localStorage:', e);
-    }
-    const { defaultSales } = generateInitialData();
-    return defaultSales;
-  });
+  // Inicialização de Vendas via Firebase
+  const [sales, setSales] = useState<Sale[]>([]);
 
   // Inicialização de Logo da Loja
   const [storeLogo, setStoreLogo] = useState<string>(() => {
     return localStorage.getItem('caixa_store_logo') || '';
   });
 
-  // Inicialização de Ordens de Serviço
-  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(() => {
-    try {
-      const saved = localStorage.getItem('caixa_service_orders');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error('Erro ao ler OS do localStorage:', e);
-    }
-    
-    // Dados demonstrativos padrão para OS se estiver vazio
-    const now = new Date();
-    const year = now.getFullYear();
-    const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-    return [
-      {
-        id: 'os-1',
-        osNumber: 'OS-0001',
-        createdAt: `${year}-${monthStr}-10`,
-        clientName: 'Roberto de Souza Prado',
-        clientPhone: '11999998888',
-        clientAddress: 'Av. Paulista, 1000 - Bela Vista, São Paulo/SP',
-        clientCpf: '123.456.789-10',
-        device: 'Celular Samsung',
-        model: 'Galaxy S23 Ultra',
-        patternLock: [1, 5, 9, 8],
-        textPassword: '',
-        accessories: 'Carregador e Capa de silicone cinza',
-        notes: 'Aparelho com marcas normais de uso. Película trincada.',
-        defect: 'Tela quebrou após queda média. Vidro estilhaçado, mas touch ainda responde parcialmente em algumas áreas.',
-        budget: 'Troca de tela frontal original AMOLED - R$ 1.450,00 (mão de obra inclusa)',
-        whatWasDone: 'Efetuada a substituição da tela frontal completa original. Realizados testes de calibração do sensor biométrico e touch sob tela. Funcionamento 100% restabelecido.',
-        status: 'Pronta',
-        value: 1450,
-        technicianId: 'sel-1'
-      },
-      {
-        id: 'os-2',
-        osNumber: 'OS-0002',
-        createdAt: `${year}-${monthStr}-15`,
-        clientName: 'Marina Albuquerque Silva',
-        clientPhone: '21988887777',
-        clientAddress: 'Rua das Flores, 45 - Copacabana, Rio de Janeiro/RJ',
-        clientCpf: '987.654.321-00',
-        device: 'Notebook Dell',
-        model: 'Inspiron 15 5000',
-        patternLock: [],
-        textPassword: 'marina_entrada',
-        accessories: 'Fonte de alimentação bivolt original Dell',
-        notes: 'Sem marcas físicas aparentes. Muito bem conservado.',
-        defect: 'Aparelho extremamente lento para iniciar o sistema operacional Windows 11. Demora cerca de 5 minutos para carregar telas simples.',
-        budget: 'Upgrade de armazenamento: Instalação de SSD NVMe 512GB Kingston e formatação limpa - R$ 380,00',
-        whatWasDone: 'Aberto equipamento, realizada higienização interna completa e troca de pasta térmica do processador. Instalado SSD NVMe de alta velocidade e instalado sistema operacional Windows 11 Pro original limpo com pacotes básicos de utilitários.',
-        status: 'Entregue',
-        value: 380,
-        technicianId: 'sel-2'
-      }
-    ];
-  });
+  // Inicialização de Ordens de Serviço via Firebase
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+
+  // Inicialização de Mercadorias via Firebase
+  const [products, setProducts] = useState<Product[]>([]);
 
   // Sincronização automática na nuvem a cada 5 cliques/ações
   const [clickCount, setClickCount] = useState<number>(0);
   const [showSyncToast, setShowSyncToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>('');
 
-  // Salvar no localStorage sempre que houver mudanças
+  // Sincronizar dados em tempo real com Firebase Firestore
   useEffect(() => {
-    localStorage.setItem('caixa_sellers', JSON.stringify(sellers));
-  }, [sellers]);
+    const unsub = subscribeSellers((list) => {
+      if (list.length === 0) {
+        // Se banco de dados estiver limpo, semeia com dados iniciais
+        const { defaultSellers } = generateInitialData();
+        defaultSellers.forEach(dbSaveSeller);
+      } else {
+        setSellers(list);
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('caixa_sales', JSON.stringify(sales));
-  }, [sales]);
+    const unsub = subscribeSales((list) => {
+      if (list.length === 0) {
+        const { defaultSales } = generateInitialData();
+        defaultSales.forEach(dbSaveSale);
+      } else {
+        setSales(list);
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('caixa_service_orders', JSON.stringify(serviceOrders));
-  }, [serviceOrders]);
+    const unsub = subscribeServiceOrders((list) => {
+      setServiceOrders(list);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = subscribeProducts((list) => {
+      setProducts(list);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (storeLogo) {
@@ -162,18 +119,18 @@ export default function App() {
   });
 
   // Controle de Abas
-  const [activeTab, setActiveTab] = useState<'livro-caixa' | 'ordens-servico' | 'vendedores' | 'resumo' | 'sincronizacao'>('livro-caixa');
+  const [activeTab, setActiveTab] = useState<'livro-caixa' | 'ordens-servico' | 'produtos' | 'vendedores' | 'resumo' | 'sincronizacao'>('livro-caixa');
 
   const years = [2024, 2025, 2026, 2027, 2028];
 
-  // Métodos CRUD para Vendedores
+  // Métodos CRUD para Vendedores com Firebase
   const handleAddSeller = (newSeller: Omit<Seller, 'id'>) => {
     const id = `sel-${Date.now()}`;
-    setSellers((prev) => [...prev, { ...newSeller, id }]);
+    dbSaveSeller({ ...newSeller, id });
   };
 
   const handleUpdateSeller = (updatedSeller: Seller) => {
-    setSellers((prev) => prev.map((s) => (s.id === updatedSeller.id ? updatedSeller : s)));
+    dbSaveSeller(updatedSeller);
   };
 
   const handleDeleteSeller = (id: string) => {
@@ -184,24 +141,24 @@ export default function App() {
       );
       if (!confirmForce) return;
     }
-    setSellers((prev) => prev.filter((s) => s.id !== id));
+    dbDeleteSeller(id);
   };
 
-  // Métodos CRUD para Vendas
+  // Métodos CRUD para Vendas com Firebase
   const handleAddSale = (newSale: Omit<Sale, 'id'>) => {
     const id = `sale-${Date.now()}`;
-    setSales((prev) => [...prev, { ...newSale, id }]);
+    dbSaveSale({ ...newSale, id });
   };
 
   const handleUpdateSale = (updatedSale: Sale) => {
-    setSales((prev) => prev.map((s) => (s.id === updatedSale.id ? updatedSale : s)));
+    dbSaveSale(updatedSale);
   };
 
   const handleDeleteSale = (id: string) => {
-    setSales((prev) => prev.filter((s) => s.id !== id));
+    dbDeleteSale(id);
   };
 
-  // Métodos CRUD para Ordens de Serviço (OS)
+  // Métodos CRUD para Ordens de Serviço (OS) com Firebase
   const handleAddOS = (newOS: Omit<ServiceOrder, 'id' | 'osNumber' | 'createdAt'>) => {
     const id = `os-${Date.now()}`;
     // Gerar número sequencial de OS: OS-XXXX
@@ -209,23 +166,34 @@ export default function App() {
     const osNumber = `OS-${String(nextNum).padStart(4, '0')}`;
     const createdAt = new Date().toISOString().slice(0, 10); // Formato YYYY-MM-DD
 
-    setServiceOrders((prev) => [
-      ...prev, 
-      { 
-        ...newOS, 
-        id, 
-        osNumber, 
-        createdAt 
-      }
-    ]);
+    dbSaveServiceOrder({ 
+      ...newOS, 
+      id, 
+      osNumber, 
+      createdAt 
+    });
   };
 
   const handleUpdateOS = (updatedOS: ServiceOrder) => {
-    setServiceOrders((prev) => prev.map((os) => (os.id === updatedOS.id ? updatedOS : os)));
+    dbSaveServiceOrder(updatedOS);
   };
 
   const handleDeleteOS = (id: string) => {
-    setServiceOrders((prev) => prev.filter((os) => os.id !== id));
+    dbDeleteServiceOrder(id);
+  };
+
+  // Métodos CRUD para Mercadorias/Produtos com Firebase
+  const handleAddProduct = (newProduct: Omit<Product, 'id'>) => {
+    const id = `prod-${Date.now()}`;
+    dbSaveProduct({ ...newProduct, id });
+  };
+
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    dbSaveProduct(updatedProduct);
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    dbDeleteProduct(id);
   };
 
   const totalAllTimeRevenue = useMemo(() => {
@@ -346,6 +314,18 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => { handleTriggerClick(); setActiveTab('produtos'); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === 'produtos'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/15'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Package className="h-4.5 w-4.5 flex-none" />
+              Mercadorias / Estoque
+            </button>
+
+            <button
               onClick={() => { handleTriggerClick(); setActiveTab('vendedores'); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'vendedores'
@@ -399,11 +379,14 @@ export default function App() {
             <DailyLedger
               sales={sales}
               sellers={sellers}
+              products={products}
               selectedYear={selectedYear}
               selectedMonth={selectedMonth}
               onAddSale={handleAddSale}
               onUpdateSale={handleUpdateSale}
               onDeleteSale={handleDeleteSale}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
               triggerClick={handleTriggerClick}
             />
           )}
@@ -428,6 +411,16 @@ export default function App() {
               onUpdateSeller={handleUpdateSeller}
               onDeleteSeller={handleDeleteSeller}
               onUpdateStoreLogo={setStoreLogo}
+              triggerClick={handleTriggerClick}
+            />
+          )}
+
+          {activeTab === 'produtos' && (
+            <ProductsConfig
+              products={products}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
               triggerClick={handleTriggerClick}
             />
           )}
